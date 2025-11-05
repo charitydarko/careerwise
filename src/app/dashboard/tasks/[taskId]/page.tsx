@@ -207,10 +207,10 @@ export default function TaskDetailPage({
                   asChild
                   className="flex-1 rounded-full bg-[#1F3C88] text-white hover:bg-[#153070]"
                 >
-                  <Link href="/mentor">Send async update</Link>
+                  <Link href="/mentor?tab=chat">Send async update</Link>
                 </Button>
                 <Button asChild variant="outline" className="rounded-full">
-                  <Link href="/mentor">Save to notebook</Link>
+                  <Link href="/mentor?tab=chat">Save to notebook</Link>
                 </Button>
               </div>
             </FadeInSection>
@@ -227,7 +227,7 @@ export default function TaskDetailPage({
               className="size-10 rounded-full bg-white/20 text-white hover:bg-white/30"
               asChild
             >
-              <Link href="/mentor">
+              <Link href="/mentor?tab=chat">
                 <MessageCircle className="h-5 w-5" />
               </Link>
             </Button>
@@ -237,7 +237,7 @@ export default function TaskDetailPage({
               className="size-10 rounded-full bg-[#00BFA6] text-white hover:bg-[#00a48f]"
               asChild
             >
-              <Link href="/mentor">
+              <Link href="/mentor?tab=voice">
                 <Mic className="h-5 w-5" />
               </Link>
             </Button>
@@ -248,7 +248,7 @@ export default function TaskDetailPage({
           size="icon"
           className="pointer-events-auto size-14 rounded-full bg-[#00BFA6] text-white shadow-[0_20px_50px_rgba(0,191,166,0.35)] transition hover:bg-[#00a48f]"
         >
-          <Link href="/mentor">
+          <Link href="/mentor?tab=chat">
             <MessageCircle className="h-6 w-6" />
           </Link>
         </Button>

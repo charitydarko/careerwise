@@ -67,14 +67,18 @@ export default function TasksIndexPage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 md:items-end">
-            <Button className="h-12 rounded-full bg-[#00BFA6] px-6 text-base font-semibold text-white shadow-lg shadow-[#00BFA6]/30 transition hover:bg-[#00a48f]">
-              Sync with mentor
+            <Button
+              asChild
+              className="h-12 rounded-full bg-[#00BFA6] px-6 text-base font-semibold text-white shadow-lg shadow-[#00BFA6]/30 transition hover:bg-[#00a48f]"
+            >
+              <Link href="/mentor?tab=chat">Sync with mentor</Link>
             </Button>
             <Button
+              asChild
               variant="outline"
               className="h-12 rounded-full border-[#1F3C88]/30 px-6 text-base font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
             >
-              Review plan roadmap
+              <Link href="/dashboard/tracker">Review plan roadmap</Link>
             </Button>
           </div>
         </header>
@@ -124,13 +128,17 @@ export default function TasksIndexPage() {
               Ping your mentor for personalised prompts or hop into a quick voice session without leaving the task view.
             </p>
             <div className="flex gap-3">
-              <Button className="flex-1 rounded-full bg-white text-[#1F3C88] hover:bg-slate-100">
-                <MessageCircle className="mr-2 h-4 w-4" />
-                Chat mentor
+              <Button className="flex-1 rounded-full bg-white text-[#1F3C88] hover:bg-slate-100" asChild>
+                <Link href="/mentor?tab=chat">
+                  <MessageCircle className="mr-2 h-4 w-4" />
+                  Chat mentor
+                </Link>
               </Button>
-              <Button className="flex-1 rounded-full bg-[#00BFA6] text-white hover:bg-[#00a48f]">
-                <Mic className="mr-2 h-4 w-4" />
-                Start voice
+              <Button className="flex-1 rounded-full bg-[#00BFA6] text-white hover:bg-[#00a48f]" asChild>
+                <Link href="/mentor?tab=voice">
+                  <Mic className="mr-2 h-4 w-4" />
+                  Start voice
+                </Link>
               </Button>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 text-sm">

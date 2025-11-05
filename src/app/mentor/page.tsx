@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import {
+  ArrowLeft,
   AudioLines,
   Download,
   Headphones,
@@ -39,6 +41,8 @@ type VoiceInteraction = {
   transcript: string;
   aiInsights: string[];
 };
+
+type MentorTab = "chat" | "voice" | "history";
 
 type LLMEvent = {
   id: string;
@@ -88,7 +92,18 @@ const mockEvents: LLMEvent[] = [
 ];
 
 export default function VoiceMentorPage() {
-  const [tab, setTab] = useState<"chat" | "voice" | "history">("chat");
+  const searchParams = useSearchParams();
+  const getValidTab = (value: string | null): MentorTab => {
+    if (value === "voice" || value === "history") {
+      return value;
+    }
+    return "chat";
+  };
+
+  const tabParam = searchParams.get("tab");
+  const tabFromParams = useMemo(() => getValidTab(tabParam), [tabParam]);
+  const [tabOverride, setTabOverride] = useState<MentorTab | null>(null);
+  const tab = tabOverride ?? tabFromParams;
   const [events, setEvents] = useState<LLMEvent[]>(mockEvents);
   const [chatInput, setChatInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -135,6 +150,18 @@ export default function VoiceMentorPage() {
     <main className="min-h-screen bg-[#f3f6ff] pb-16 pt-12 font-[family:var(--font-inter)]">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 lg:px-10">
         <header className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur md:p-8">
+          <div className="mb-6 flex justify-start">
+            <Button
+              variant="ghost"
+              asChild
+              className="inline-flex items-center gap-2 rounded-full bg-[#f1f5ff] px-4 py-2 text-sm font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
+            >
+              <Link href="/dashboard">
+                <ArrowLeft className="h-4 w-4" />
+                Back to dashboard
+              </Link>
+            </Button>
+          </div>
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 rounded-full bg-[#e0f2fe] px-4 py-2 text-sm font-semibold text-[#1F3C88]">
@@ -160,7 +187,10 @@ export default function VoiceMentorPage() {
           </div>
         </header>
 
-        <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
+        <Tabs
+          value={tab}
+          onValueChange={(value) => setTabOverride(value as MentorTab)}
+        >
           <TabsList className="flex w-full flex-col gap-3 rounded-3xl border border-white/70 bg-white/90 p-3 shadow-md md:flex-row md:gap-2 md:p-2">
             <TabsTrigger
               value="chat"
