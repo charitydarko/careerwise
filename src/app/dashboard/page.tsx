@@ -10,6 +10,7 @@ import {
   Clock,
   Flame,
   Headphones,
+  LayoutDashboard,
   MessageCircle,
   Sparkles,
 } from "lucide-react";
@@ -268,6 +269,16 @@ export default function CurriculumDashboardPage() {
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <Button
+              asChild
+              variant="outline"
+              className="inline-flex items-center gap-2 rounded-full border-[#1F3C88]/30 px-4 py-2 text-sm font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
+            >
+              <Link href="/admin">
+                <LayoutDashboard className="h-4 w-4" />
+                Creator tools
+              </Link>
+            </Button>
           </div>
         </header>
 
