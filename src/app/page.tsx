@@ -111,7 +111,7 @@ function HeroSection() {
               size="lg"
               className="h-14 rounded-full bg-[#00BFA6] px-8 text-lg font-semibold text-white shadow-lg shadow-[#00BFA6]/30 transition hover:bg-[#00a48f]"
             >
-              <Link href="/onboarding">Join Waitlist</Link>
+              <Link href="/onboarding">Get Started</Link>
             </Button>
             <Link
               href="#how-it-works"
