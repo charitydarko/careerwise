@@ -82,6 +82,7 @@ export default function Home() {
       <MarketProofSection />
       <SocialProofSection />
       <FooterSection />
+      <FloatingLoginButton />
     </main>
   );
 }
@@ -219,6 +220,20 @@ function ChatBubble({ align, tone, title, content }: ChatBubbleProps) {
         {title}
       </p>
       <p className="mt-2 text-sm leading-relaxed">{content}</p>
+    </div>
+  );
+}
+
+function FloatingLoginButton() {
+  return (
+    <div className="pointer-events-none fixed bottom-6 right-6 z-30 sm:bottom-8 sm:right-8">
+      <Button
+        asChild
+        size="lg"
+        className="pointer-events-auto rounded-full bg-[#00BFA6] px-6 text-base font-semibold text-white shadow-[0_15px_50px_rgba(0,191,166,0.35)] hover:bg-[#009f8b]"
+      >
+        <Link href="/login">Login</Link>
+      </Button>
     </div>
   );
 }

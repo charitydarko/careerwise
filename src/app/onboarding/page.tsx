@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,15 +10,22 @@ import {
   Clock4,
   Cloud,
   Loader2,
+  LogIn,
+  Mail,
   MessageCircle,
   Mic,
+  PauseCircle,
+  PlayCircle,
   Rocket,
   Sparkles,
+  X,
 } from "lucide-react";
 
 import { FadeInSection } from "@/components/fade-in-section";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 const TOTAL_STEPS = 5;
@@ -46,6 +53,19 @@ const trackOptions = [
 
 type EngagementMode = "voice" | "chat";
 
+type VoiceNote = {
+  step: number;
+  prompt: string;
+};
+
+const VOICE_PROMPTS: Record<number, string> = {
+  1: "Tell me what role or skill you want to accelerate and why it matters right now.",
+  2: "Choose a focus track so I can tailor the sprint to the skills you need to level up.",
+  3: "Share a quick goal statement and how many hours you can dedicate each week.",
+  4: "Let me know if you want voice check-ins, chat nudges, and how often you’d like reminders.",
+  5: "Great work — I’m generating your personalised 14-day plan now. Get ready for your first tasks!",
+};
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -56,6 +76,20 @@ export default function OnboardingPage() {
   const [dailyReminders, setDailyReminders] = useState(true);
   const [weeklySummary, setWeeklySummary] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [voiceGuideActive, setVoiceGuideActive] = useState(false);
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
+  const [planShareModalOpen, setPlanShareModalOpen] = useState(false);
+  const [hasTriggeredPlanShare, setHasTriggeredPlanShare] = useState(false);
+  const [shareEmail, setShareEmail] = useState("");
+  const [emailStatus, setEmailStatus] = useState<
+    "idle" | "sending" | "sent" | "error"
+  >("idle");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const emailTimeoutRef = useRef<number | null>(null);
+  const selectedTrackDetails = trackOptions.find(
+    (option) => option.id === selectedTrack,
+  );
 
   useEffect(() => {
     if (currentStep === 5) {
@@ -79,6 +113,41 @@ export default function OnboardingPage() {
     [currentStep],
   );
 
+  useEffect(() => {
+    if (
+      currentStep === 5 &&
+      generationProgress >= 100 &&
+      !hasTriggeredPlanShare
+    ) {
+      setPlanShareModalOpen(true);
+      setHasTriggeredPlanShare(true);
+    }
+  }, [currentStep, generationProgress, hasTriggeredPlanShare]);
+
+  useEffect(() => {
+    if (!voiceGuideActive) {
+      return;
+    }
+    const prompt = VOICE_PROMPTS[currentStep];
+    if (!prompt) {
+      return;
+    }
+    setVoiceNotes((previous) => {
+      if (previous.some((note) => note.step === currentStep)) {
+        return previous;
+      }
+      return [...previous, { step: currentStep, prompt }];
+    });
+  }, [voiceGuideActive, currentStep]);
+
+  useEffect(() => {
+    return () => {
+      if (emailTimeoutRef.current) {
+        window.clearTimeout(emailTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const goNext = () => {
     if (currentStep === TOTAL_STEPS) {
       return;
@@ -95,6 +164,62 @@ export default function OnboardingPage() {
       return;
     }
     setCurrentStep((step) => Math.max(step - 1, 1));
+  };
+
+  const handleToggleListening = () => {
+    setIsVoiceListening((previous) => !previous);
+  };
+
+  const handleEndVoiceGuide = () => {
+    setIsVoiceListening(false);
+    setVoiceGuideActive(false);
+    setVoiceNotes([]);
+  };
+
+  const handleSendPlanEmail = () => {
+    if (emailStatus === "sending" || emailStatus === "sent") {
+      return;
+    }
+    const trimmed = shareEmail.trim();
+    if (!trimmed) {
+      setEmailStatus("error");
+      setEmailError("Enter an email to send your plan.");
+      return;
+    }
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(trimmed)) {
+      setEmailStatus("error");
+      setEmailError("Add a valid email address.");
+      return;
+    }
+    setEmailStatus("sending");
+    setEmailError(null);
+    if (emailTimeoutRef.current) {
+      window.clearTimeout(emailTimeoutRef.current);
+    }
+    emailTimeoutRef.current = window.setTimeout(() => {
+      setEmailStatus("sent");
+    }, 900);
+  };
+
+  const handleClosePlanShare = () => {
+    setPlanShareModalOpen(false);
+  };
+
+  const handleLoginRedirect = () => {
+    setPlanShareModalOpen(false);
+    router.push("/signup");
+  };
+
+  const planSummary = {
+    track: selectedTrackDetails?.title ?? "Personalized skill sprint",
+    goal: goal.trim(),
+    hoursPerWeek,
+    mode,
+    reminders: {
+      daily: dailyReminders,
+      weekly: weeklySummary,
+    },
   };
 
   return (
@@ -167,14 +292,41 @@ export default function OnboardingPage() {
                   </div>
                 </nav>
               )}
+              {voiceGuideActive && (
+                <VoiceGuidePanel
+                  notes={voiceNotes}
+                  isListening={isVoiceListening}
+                  activeStep={currentStep}
+                  onToggleListening={handleToggleListening}
+                  onEnd={handleEndVoiceGuide}
+                />
+              )}
             </div>
           </Card>
         </FadeInSection>
       </div>
+      {planShareModalOpen && (
+        <PlanShareModal
+          email={shareEmail}
+          emailStatus={emailStatus}
+          emailError={emailError}
+          onEmailChange={(value) => {
+            setShareEmail(value);
+            if (emailStatus !== "idle") {
+              setEmailStatus("idle");
+              setEmailError(null);
+            }
+          }}
+          onSendEmail={handleSendPlanEmail}
+          onClose={handleClosePlanShare}
+          onLogin={handleLoginRedirect}
+          planSummary={planSummary}
+        />
+      )}
     </main>
   );
 
-  function renderStep() {
+function renderStep() {
     switch (currentStep) {
       case 1:
         return (
@@ -194,14 +346,14 @@ export default function OnboardingPage() {
             <AudioPulse />
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button
-                onClick={goNext}
+                onClick={() => setCurrentStep(2)}
                 className="h-12 min-w-[150px] rounded-full bg-[#00BFA6] px-6 text-base font-semibold text-white shadow-md shadow-[#00BFA6]/20 transition hover:bg-[#00a48f]"
               >
                 Let’s Start
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setCurrentStep(2)}
+                onClick={() => setCurrentStep(3)}
                 className="h-12 min-w-[150px] rounded-full border border-slate-200 bg-white px-6 text-base font-semibold text-slate-600 hover:bg-slate-50"
               >
                 Skip intro
@@ -445,6 +597,267 @@ export default function OnboardingPage() {
         return null;
     }
   }
+}
+
+function PlanShareModal({
+  email,
+  emailStatus,
+  emailError,
+  onEmailChange,
+  onSendEmail,
+  onClose,
+  onLogin,
+  planSummary,
+}: {
+  email: string;
+  emailStatus: "idle" | "sending" | "sent" | "error";
+  emailError: string | null;
+  onEmailChange: (value: string) => void;
+  onSendEmail: () => void;
+  onClose: () => void;
+  onLogin: () => void;
+  planSummary: {
+    track: string;
+    goal: string;
+    hoursPerWeek: number;
+    mode: EngagementMode;
+    reminders: { daily: boolean; weekly: boolean };
+  };
+}) {
+  const reminderBadges = [
+    planSummary.reminders.daily ? "Daily nudges" : null,
+    planSummary.reminders.weekly ? "Weekly summary" : null,
+  ].filter(Boolean) as string[];
+
+  const goalCopy =
+    planSummary.goal ||
+    "You can refine this goal once you’re inside CareerWise.";
+
+  const emailButtonLabel =
+    emailStatus === "sent"
+      ? "Plan sent"
+      : emailStatus === "sending"
+        ? "Sending..."
+        : "Email me the plan";
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 px-4 py-8">
+      <div className="relative w-full max-w-xl rounded-[32px] border border-white/60 bg-white/95 p-8 shadow-[0_30px_120px_rgba(15,23,42,0.45)] backdrop-blur">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-6 top-6 inline-flex size-10 items-center justify-center rounded-full border border-slate-200/80 text-slate-500 transition hover:bg-slate-50"
+        >
+          <span className="sr-only">Close</span>
+          <X className="h-5 w-5" />
+        </button>
+        <div className="space-y-6 text-center">
+          <div className="space-y-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-[#ecfdf9] px-4 py-1 text-sm font-semibold text-[#00BFA6]">
+              <Sparkles className="h-4 w-4" />
+              Plan ready
+            </span>
+            <h3 className="text-2xl font-semibold text-[#1F3C88]">
+              Your personalised sprint is ready to share.
+            </h3>
+            <p className="text-base text-slate-600">
+              Send the highlights to your inbox or log in to keep momentum with CareerWise.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-[#f8fbff] p-5 text-left">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#1F3C88]">
+              Plan preview
+            </p>
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <div className="flex items-start gap-3">
+                <Check className="mt-1 h-4 w-4 text-[#00BFA6]" />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Focus track
+                  </p>
+                  <p className="text-base font-semibold text-[#1F3C88]">
+                    {planSummary.track}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check className="mt-1 h-4 w-4 text-[#00BFA6]" />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Weekly time
+                  </p>
+                  <p className="text-base font-semibold text-[#1F3C88]">
+                    {planSummary.hoursPerWeek} hrs / week · {planSummary.mode === "voice" ? "Voice mentor" : "Chat mentor"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <Check className="mt-1 h-4 w-4 text-[#00BFA6]" />
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Goal
+                  </p>
+                  <p className="text-base font-semibold text-[#1F3C88]">
+                    {goalCopy}
+                  </p>
+                </div>
+              </div>
+              {reminderBadges.length > 0 && (
+                <div className="flex items-start gap-3">
+                  <Check className="mt-1 h-4 w-4 text-[#00BFA6]" />
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                      Nudges
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold text-[#1F3C88]">
+                      {reminderBadges.map((label) => (
+                        <span
+                          key={label}
+                          className="rounded-full bg-white px-3 py-1 shadow-sm"
+                        >
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3 text-left">
+            <label
+              htmlFor="plan-email"
+              className="text-sm font-semibold text-[#1F3C88]"
+            >
+              Email it to yourself
+            </label>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Mail className="pointer-events-none absolute left-4 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-slate-400 sm:block" />
+                <Input
+                  id="plan-email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(event) => onEmailChange(event.target.value)}
+                  className="h-12 rounded-full border-slate-200 bg-white pl-4 pr-4 text-base text-slate-600 sm:pl-12"
+                />
+              </div>
+              <Button
+                onClick={onSendEmail}
+                disabled={emailStatus === "sending"}
+                className="h-12 min-w-[160px] rounded-full bg-[#00BFA6] px-6 text-base font-semibold text-white shadow-lg shadow-[#00BFA6]/30 transition hover:bg-[#00a48f] disabled:cursor-not-allowed disabled:opacity-80"
+              >
+                {emailButtonLabel}
+              </Button>
+            </div>
+            {emailError && (
+              <p className="text-sm font-semibold text-red-500">{emailError}</p>
+            )}
+            {emailStatus === "sent" && !emailError && (
+              <p className="text-sm font-semibold text-[#00BFA6]">
+                Sent! Check your inbox for the full plan and resource starter kit.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-[#1F3C88]/20 bg-[#1F3C88]/5 p-5 text-left">
+            <p className="text-sm font-semibold text-[#1F3C88]">
+              Want to track progress & learn in the mentor?
+            </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Log in to unlock voice notes, accountability nudges, and your full dashboard.
+            </p>
+            <Button
+              onClick={onLogin}
+              className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#1F3C88] px-6 text-base font-semibold text-white shadow-md transition hover:bg-[#162f70]"
+            >
+              <LogIn className="h-5 w-5" />
+              Log in to track progress & learn
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VoiceGuidePanel({
+  notes,
+  isListening,
+  activeStep,
+  onToggleListening,
+  onEnd,
+}: {
+  notes: VoiceNote[];
+  isListening: boolean;
+  activeStep: number;
+  onToggleListening: () => void;
+  onEnd: () => void;
+}) {
+  return (
+    <div className="mt-6 rounded-3xl border border-white/70 bg-white/85 p-5 shadow-[0_12px_60px_rgba(31,60,136,0.12)]">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-[#e0f2fe] text-[#1F3C88]">
+            {isListening ? <Mic className="h-6 w-6" /> : <PauseCircle className="h-6 w-6" />}
+          </span>
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-slate-400">
+              Voice guide
+            </p>
+            <p className="text-base font-semibold text-[#1F3C88]">
+              {isListening ? "Listening for your responses…" : "Paused"} · Step {activeStep}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={onToggleListening}
+            className="rounded-full border-[#1F3C88]/30 px-4 text-sm font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
+          >
+            {isListening ? (
+              <span className="inline-flex items-center gap-2">
+                <PauseCircle className="h-4 w-4" />
+                Pause
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <PlayCircle className="h-4 w-4" />
+                Resume
+              </span>
+            )}
+          </Button>
+          <Button variant="ghost" onClick={onEnd} className="rounded-full px-4 text-sm font-semibold text-[#1F3C88] hover:text-[#153070]">
+            End
+          </Button>
+        </div>
+      </div>
+      <ScrollArea className="mt-4 max-h-48 rounded-2xl border border-slate-200/60 bg-white/90 p-4">
+        <div className="space-y-3 text-sm text-slate-600">
+          {notes.map((note) => (
+            <div
+              key={note.step}
+              className="rounded-2xl border border-[#00BFA6]/20 bg-[#ecfdf9] px-4 py-3"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#007864]">
+                Voice prompt · Step {note.step}
+              </p>
+              <p className="mt-2 text-sm text-[#1F3C88]">{note.prompt}</p>
+            </div>
+          ))}
+          {notes.length === 0 && (
+            <p className="text-center text-sm text-slate-400">
+              I’ll surface hints for each step as you go.
+            </p>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
 }
 
 function AudioPulse() {
