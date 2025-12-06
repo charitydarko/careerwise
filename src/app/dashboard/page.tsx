@@ -1,32 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import {
   CalendarCheck,
   CheckCircle2,
-  ChevronRight,
   Clock,
   Flame,
-  Headphones,
-  LayoutDashboard,
-  MessageCircle,
+  Loader2,
+  Settings,
   Sparkles,
 } from "lucide-react";
+import { VoicePanelV2 } from "@/components/voice/voice-panel-v2";
 
 import { FadeInSection } from "@/components/fade-in-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -188,23 +179,66 @@ const difficultyMap: Record<
 };
 
 export default function CurriculumDashboardPage() {
-  const [planId, setPlanId] = useState<string>(mockPlans[0]?.id ?? "");
-  const [chatInput, setChatInput] = useState("");
-  const [messages, setMessages] = useState<
-    Array<{ id: number; role: "mentor" | "me"; content: string }>
-  >([
-    {
-      id: 1,
-      role: "mentor",
-      content:
-        "Welcome back! I’ve queued your daily sprint. Let me know where you need support.",
-    },
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [userData, setUserData] = useState<any>(null);
+  const [tasks, setTasks] = useState<DailyTask[]>([]);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [showTextChat, setShowTextChat] = useState(false);
 
-  const selectedPlan = useMemo(
-    () => mockPlans.find((plan) => plan.id === planId) ?? mockPlans[0],
-    [planId],
-  );
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [progressRes, tasksRes, achievementsRes] = await Promise.all([
+          fetch("/api/user/progress"),
+          fetch("/api/tasks"),
+          fetch("/api/achievements"),
+        ]);
+        
+        if (progressRes.ok) {
+          const data = await progressRes.json();
+          setUserData(data);
+        }
+        
+        if (tasksRes.ok) {
+          const tasksData = await tasksRes.json();
+          setTasks(tasksData.tasks);
+        }
+        
+        if (achievementsRes.ok) {
+          const achievementsData = await achievementsRes.json();
+          setAchievements(achievementsData.achievements);
+        }
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const selectedPlan = useMemo(() => {
+    if (!userData) return mockPlans[0];
+    
+    const profile = userData.profile;
+    const progress = userData.progress;
+    
+    return {
+      id: "v1",
+      label: `${profile?.careerTrack || "Career"} Sprint · v1`,
+      currentDay: progress?.currentDay || 1,
+      totalDays: progress?.totalDays || 14,
+      progressPct: progress?.progressPercent || 0,
+      streakDays: progress?.streakDays || 0,
+      todayTasks: tasks,
+      achievements: achievements.map(a => ({
+        id: a.id,
+        title: a.title,
+        subtitle: a.subtitle,
+        unlocked: a.unlocked,
+      })),
+    };
+  }, [userData, tasks, achievements]);
 
   const progressCopy = useMemo(() => {
     if (!selectedPlan) {
@@ -214,23 +248,16 @@ export default function CurriculumDashboardPage() {
     return `Day ${currentDay} · ${Math.round((currentDay / totalDays) * 100)}% of sprint`;
   }, [selectedPlan]);
 
-  const handleSendMessage = () => {
-    if (!chatInput.trim()) {
-      return;
-    }
-    const nextId = messages.length + 1;
-    setMessages((prev) => [
-      ...prev,
-      { id: nextId, role: "me", content: chatInput.trim() },
-      {
-        id: nextId + 1,
-        role: "mentor",
-        content:
-          "Got it! I’ll add a tip for that task and share a resource in your inbox.",
-      },
-    ]);
-    setChatInput("");
-  };
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f3f6ff]">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#1F3C88] border-t-transparent"></div>
+          <p className="mt-4 text-sm text-slate-600">Loading your dashboard...</p>
+        </div>
+      </main>
+    );
+  }
 
   if (!selectedPlan) {
     return null;
@@ -245,40 +272,31 @@ export default function CurriculumDashboardPage() {
               Your plan
             </span>
             <h1 className="text-3xl font-semibold text-[#1F3C88] md:text-4xl">
-              CareerWise Curriculum Dashboard
+              {userData?.user?.name ? `Welcome back, ${userData.user.name}!` : "CareerWise Dashboard"}
             </h1>
             <p className="text-base text-slate-600">
               {progressCopy} · Last sync {format(new Date(), "MMM d, h:mma")}
             </p>
           </div>
           <div className="flex flex-col gap-3 md:items-end">
-            <label className="text-sm font-semibold text-slate-500">
-              Plan version
-            </label>
-            <Select value={planId} onValueChange={setPlanId}>
-              <SelectTrigger className="h-12 min-w-[220px] rounded-full border border-slate-200 bg-white px-5 text-base font-semibold text-[#1F3C88] shadow-sm">
-                <SelectValue placeholder="Select plan" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                <SelectGroup>
-                  {mockPlans.map((plan) => (
-                    <SelectItem key={plan.id} value={plan.id}>
-                      {plan.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            <Button
-              asChild
-              variant="outline"
-              className="inline-flex items-center gap-2 rounded-full border-[#1F3C88]/30 px-4 py-2 text-sm font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
-            >
-              <Link href="/admin">
-                <LayoutDashboard className="h-4 w-4" />
-                Creator tools
-              </Link>
-            </Button>
+            <Link href="/settings">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-2 text-slate-600 hover:text-[#1F3C88]"
+              >
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </Button>
+            </Link>
+            <div className="rounded-3xl border border-[#00BFA6]/20 bg-[#ecfdf9] px-5 py-3 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#007864]">
+                Career Track
+              </p>
+              <p className="text-lg font-semibold capitalize text-[#1F3C88]">
+                {userData?.profile?.careerTrack || "Not set"}
+              </p>
+            </div>
           </div>
         </header>
 
@@ -325,33 +343,34 @@ export default function CurriculumDashboardPage() {
                     Complete to keep your streak alive.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    asChild
-                    className="inline-flex items-center gap-2 rounded-full bg-[#f1f5ff] px-4 py-2 text-sm font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
-                  >
-                    <Link href="/dashboard/tasks">
-                      View task list
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    asChild
-                    className="inline-flex items-center gap-2 rounded-full bg-[#f1f5ff] px-4 py-2 text-sm font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
-                  >
-                    <Link href="/dashboard/tracker">
-                      View sprint tracker
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
               </div>
               <ScrollArea className="h-[360px] pr-4">
                 <div className="space-y-4">
                   {selectedPlan.todayTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} />
+                    <TaskCard 
+                      key={task.id} 
+                      task={task}
+                      onToggle={async () => {
+                        // Refresh data after task completion
+                        const [progressRes, tasksRes, achievementsRes] = await Promise.all([
+                          fetch("/api/user/progress"),
+                          fetch("/api/tasks"),
+                          fetch("/api/achievements"),
+                        ]);
+                        if (progressRes.ok) {
+                          const data = await progressRes.json();
+                          setUserData(data);
+                        }
+                        if (tasksRes.ok) {
+                          const tasksData = await tasksRes.json();
+                          setTasks(tasksData.tasks);
+                        }
+                        if (achievementsRes.ok) {
+                          const achievementsData = await achievementsRes.json();
+                          setAchievements(achievementsData.achievements);
+                        }
+                      }}
+                    />
                   ))}
                 </div>
               </ScrollArea>
@@ -367,22 +386,10 @@ export default function CurriculumDashboardPage() {
                     Auto-unlocked when you hit key milestones.
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="border-[#1F3C88]/20 text-[#1F3C88]">
-                    <Flame className="mr-1 h-3.5 w-3.5 text-[#ff7b54]" />
-                    {selectedPlan.streakDays}-day streak
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    asChild
-                    className="inline-flex items-center gap-2 rounded-full bg-[#f1f5ff] px-4 py-2 text-sm font-semibold text-[#1F3C88] hover:bg-[#e4ebff]"
-                  >
-                    <Link href="/dashboard/progress">
-                      View timeline
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
+                <Badge variant="outline" className="border-[#1F3C88]/20 text-[#1F3C88]">
+                  <Flame className="mr-1 h-3.5 w-3.5 text-[#ff7b54]" />
+                  {selectedPlan.streakDays}-day streak
+                </Badge>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 {selectedPlan.achievements.map((achievement) => (
@@ -422,53 +429,17 @@ export default function CurriculumDashboardPage() {
           </section>
 
           <aside className="space-y-6">
-            <FadeInSection className="flex flex-col gap-4 rounded-3xl border border-white/80 bg-[#1F3C88] p-6 text-white shadow-[0_18px_80px_rgba(31,60,136,0.25)] backdrop-blur lg:p-8">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">
-                  <Headphones className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold">
-                    Voice mentor quick chat
-                  </h3>
-                  <p className="text-sm text-white/70">
-                    Pulse in with blockers or wins.
-                  </p>
-                </div>
-              </div>
-              <ScrollArea className="h-[260px] rounded-2xl border border-white/10 bg-white/10 p-4">
-                <div className="space-y-3">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow",
-                        message.role === "mentor"
-                          ? "ml-0 bg-white/95 text-[#1F3C88]"
-                          : "ml-auto bg-[#00BFA6] text-white",
-                      )}
-                    >
-                      {message.content}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-              <div className="flex items-center gap-2 rounded-2xl bg-white/10 p-2">
-                <MessageCircle className="h-5 w-5 text-white/70" />
-                <input
-                  value={chatInput}
-                  onChange={(event) => setChatInput(event.target.value)}
-                  placeholder="Type a quick update…"
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-white/60 focus:outline-none"
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!chatInput.trim()}
-                  className="h-10 rounded-full bg-white px-4 text-sm font-semibold text-[#1F3C88] hover:bg-slate-100 disabled:bg-white/40 disabled:text-white/60"
-                >
-                  Send
-                </Button>
-              </div>
+            <FadeInSection>
+              <VoicePanelV2
+                context={{
+                  userId: userData?.user?.id || "demo-user",
+                  careerTrack: userData?.profile?.careerTrack || "frontend",
+                  learningLevel: userData?.profile?.learningLevel || "beginner",
+                  currentPhase: userData?.progress?.currentPhase || "fundamentals",
+                  currentTopic: "Sprint planning and daily tasks",
+                }}
+                onModeSwitch={() => setShowTextChat(true)}
+              />
             </FadeInSection>
 
             <FadeInSection className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur lg:p-8">
@@ -494,9 +465,9 @@ export default function CurriculumDashboardPage() {
                   description="High-focus sessions queued today."
                 />
                 <SummaryRow
-                  label="Wins logged"
-                  value={`${messages.filter((msg) => msg.role === "mentor").length - 1}`}
-                  description="Voice mentor reflections from this week."
+                  label="Voice sessions"
+                  value="3"
+                  description="AI mentor conversations this week."
                 />
               </div>
             </FadeInSection>
@@ -507,8 +478,30 @@ export default function CurriculumDashboardPage() {
   );
 }
 
-function TaskCard({ task }: { task: DailyTask }) {
+function TaskCard({ task, onToggle }: { task: DailyTask; onToggle?: () => void }) {
   const meta = difficultyMap[task.difficulty];
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleToggle = async () => {
+    if (isUpdating) return;
+    
+    setIsUpdating(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: !task.completed }),
+      });
+
+      if (response.ok && onToggle) {
+        onToggle();
+      }
+    } catch (error) {
+      console.error("Failed to update task:", error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   return (
     <Card
@@ -538,32 +531,37 @@ function TaskCard({ task }: { task: DailyTask }) {
           <Clock className="h-4 w-4 text-[#00BFA6]" />
           <span>{task.estimatedMinutes}m</span>
         </span>
-        {task.resourceUrl && (
-          <Button
-            variant="link"
-            className="px-0 text-[#1F3C88] hover:text-[#153070]"
-            onClick={() => window.open(task.resourceUrl, "_blank")}
-          >
-            Open resource
-          </Button>
-        )}
       </div>
-      {task.completed && (
-        <div className="inline-flex items-center gap-2 self-start rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#007864]">
-          <CheckCircle2 className="h-4 w-4" />
-          Marked complete
-        </div>
-      )}
-      <div className="flex justify-end pt-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
         <Button
-          variant="ghost"
-          asChild
-          className="gap-2 text-sm font-semibold text-[#1F3C88] hover:text-[#153070]"
+          variant="outline"
+          className="rounded-full px-4 py-2 text-sm font-semibold"
+          onClick={() => task.resourceUrl && window.open(task.resourceUrl, "_blank")}
+          disabled={!task.resourceUrl}
         >
-          <Link href={`/dashboard/tasks/${task.id}`}>
-            View details
-            <ChevronRight className="h-4 w-4" />
-          </Link>
+          {task.resourceUrl ? "Open resource" : "No external resource"}
+        </Button>
+        <Button
+          onClick={handleToggle}
+          disabled={isUpdating}
+          variant={task.completed ? "outline" : "default"}
+          className={cn(
+            "rounded-full px-4 py-2 text-sm font-semibold transition",
+            task.completed
+              ? "border-[#00BFA6] bg-white text-[#00BFA6] hover:bg-[#ecfdf9]"
+              : "bg-[#00BFA6] text-white hover:bg-[#00a48f]"
+          )}
+        >
+          {isUpdating ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : task.completed ? (
+            <>
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Completed
+            </>
+          ) : (
+            "Mark complete"
+          )}
         </Button>
       </div>
     </Card>

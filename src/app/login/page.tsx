@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Lock, Mail, Sparkles } from "lucide-react";
 
@@ -9,19 +11,36 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
 export default function LoginPage() {
-  const [status, setStatus] = useState<"idle" | "submitting" | "success">(
-    "idle",
-  );
+  const router = useRouter();
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [error, setError] = useState("");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (status === "submitting") {
+    if (status === "submitting") return;
+    
+    setStatus("submitting");
+    setError("");
+
+    const formData = new FormData(event.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    const result = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
+    if (result?.error) {
+      setError("Invalid email or password");
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 3000);
       return;
     }
-    setStatus("submitting");
-    window.setTimeout(() => {
-      setStatus("success");
-    }, 900);
+
+    setStatus("success");
+    router.push("/dashboard");
   };
 
   return (
@@ -82,11 +101,16 @@ export default function LoginPage() {
                   type="password"
                   placeholder="••••••••"
                   className="h-12 rounded-full border-slate-200 bg-white pl-4 pr-4 text-base text-slate-700 sm:pl-12"
-                  minLength={6}
+                  minLength={8}
                   required
                 />
               </div>
             </label>
+            {error && (
+              <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <div className="flex flex-col gap-2 text-sm font-semibold text-[#1F3C88] sm:flex-row sm:items-center sm:justify-between">
               <Link href="/signup" className="hover:text-[#153070]">
                 Need an account? Sign up

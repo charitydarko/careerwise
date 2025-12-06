@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -86,7 +86,6 @@ export default function OnboardingPage() {
     "idle" | "sending" | "sent" | "error"
   >("idle");
   const [emailError, setEmailError] = useState<string | null>(null);
-  const emailTimeoutRef = useRef<number | null>(null);
   const selectedTrackDetails = trackOptions.find(
     (option) => option.id === selectedTrack,
   );
@@ -140,23 +139,40 @@ export default function OnboardingPage() {
     });
   }, [voiceGuideActive, currentStep]);
 
-  useEffect(() => {
-    return () => {
-      if (emailTimeoutRef.current) {
-        window.clearTimeout(emailTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const goNext = () => {
+  const goNext = async () => {
     if (currentStep === TOTAL_STEPS) {
       return;
     }
     if (currentStep === 4) {
+      // Save profile to database before generating plan
+      await saveProfile();
       setCurrentStep(5);
       return;
     }
     setCurrentStep((step) => Math.min(step + 1, TOTAL_STEPS));
+  };
+
+  const saveProfile = async () => {
+    try {
+      const response = await fetch("/api/user/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          careerTrack: selectedTrack,
+          timeCommitment: `${hoursPerWeek}-hours-per-week`,
+          preferredLearning: mode,
+          goal,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error("Failed to save profile");
+      }
+    } catch (error) {
+      console.error("Error saving profile:", error);
+    }
   };
 
   const goBack = () => {
@@ -176,7 +192,7 @@ export default function OnboardingPage() {
     setVoiceNotes([]);
   };
 
-  const handleSendPlanEmail = () => {
+  const handleSendPlanEmail = async () => {
     if (emailStatus === "sending" || emailStatus === "sent") {
       return;
     }
@@ -194,12 +210,33 @@ export default function OnboardingPage() {
     }
     setEmailStatus("sending");
     setEmailError(null);
-    if (emailTimeoutRef.current) {
-      window.clearTimeout(emailTimeoutRef.current);
-    }
-    emailTimeoutRef.current = window.setTimeout(() => {
+
+    try {
+      const response = await fetch("/api/send-plan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: trimmed,
+          plan: {
+            ...planSummary,
+            generatedAt: new Date().toISOString(),
+          },
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error ?? "Unable to send email.");
+      }
       setEmailStatus("sent");
-    }, 900);
+    } catch (error) {
+      console.error("Failed to send plan email", error);
+      setEmailStatus("error");
+      setEmailError(
+        error instanceof Error ? error.message : "Failed to send plan email.",
+      );
+    }
   };
 
   const handleClosePlanShare = () => {
@@ -747,7 +784,7 @@ function PlanShareModal({
               </div>
               <Button
                 onClick={onSendEmail}
-                disabled={emailStatus === "sending"}
+                disabled={emailStatus === "sending" || emailStatus === "sent"}
                 className="h-12 min-w-[160px] rounded-full bg-[#00BFA6] px-6 text-base font-semibold text-white shadow-lg shadow-[#00BFA6]/30 transition hover:bg-[#00a48f] disabled:cursor-not-allowed disabled:opacity-80"
               >
                 {emailButtonLabel}

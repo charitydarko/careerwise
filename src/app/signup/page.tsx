@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -21,19 +23,61 @@ const signupPerks = [
 ];
 
 export default function SignupPage() {
-  const [status, setStatus] = useState<"idle" | "submitting" | "success">(
+  const router = useRouter();
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">(
     "idle",
   );
+  const [error, setError] = useState("");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (status === "submitting") {
       return;
     }
     setStatus("submitting");
-    window.setTimeout(() => {
+    setError("");
+
+    const formData = new FormData(event.currentTarget);
+    const name = formData.get("fullName") as string;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    try {
+      // Create account
+      const signupResponse = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      const signupData = await signupResponse.json();
+
+      if (!signupResponse.ok) {
+        throw new Error(signupData.error || "Failed to create account");
+      }
+
+      // Auto-login after signup
+      const loginResult = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (loginResult?.error) {
+        setError("Account created but login failed. Please login manually.");
+        setStatus("error");
+        setTimeout(() => router.push("/login"), 2000);
+        return;
+      }
+
       setStatus("success");
-    }, 900);
+      // Redirect to onboarding
+      setTimeout(() => router.push("/onboarding"), 1000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 3000);
+    }
   };
 
   return (
@@ -114,25 +158,31 @@ export default function SignupPage() {
                   type="password"
                   placeholder="••••••••"
                   className="h-12 rounded-full border-slate-200 bg-white pl-4 pr-4 text-base text-slate-700 sm:pl-12"
-                  minLength={6}
+                  minLength={8}
                   required
                 />
               </div>
+              <p className="text-xs text-slate-500">At least 8 characters</p>
             </label>
+            {error && (
+              <div className="rounded-2xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <Button
               type="submit"
               disabled={status === "submitting" || status === "success"}
               className="h-12 w-full rounded-full bg-[#00BFA6] text-base font-semibold text-white shadow-lg shadow-[#00BFA6]/30 transition hover:bg-[#00a48f] disabled:cursor-not-allowed disabled:opacity-80"
             >
               {status === "success"
-                ? "Magic link sent"
+                ? "✓ Account created!"
                 : status === "submitting"
-                  ? "Sending..."
+                  ? "Creating account..."
                   : "Create free account"}
             </Button>
             {status === "success" && (
               <p className="rounded-2xl bg-[#ecfdf9] px-4 py-3 text-sm font-semibold text-[#007864]">
-                Check your inbox. We emailed a link to confirm your account.
+                Account created! Redirecting to onboarding...
               </p>
             )}
           </form>

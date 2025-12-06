@@ -5,11 +5,178 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User & Authentication
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  profile       CareerProfile?
+  progress      UserProgress[]
+  conversations Conversation[]
+  achievements  UserAchievement[]
+  taskProgress  TaskProgress[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// Career Profile & Learning
+// ============================================================================
+
+model CareerProfile {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  careerTrack         String   // frontend, data, cloud, ux, backend
+  learningLevel       String   @default("beginner") // beginner, intermediate, advanced
+  onboardingComplete  Boolean  @default(false)
+  timeCommitment      String?  // e.g., "30-60-minutes", "1-2-hours"
+  preferredLearning   String?  // e.g., "video", "reading", "hands-on"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("career_profiles")
+}
+
+model UserProgress {
+  id              String   @id @default(cuid())
+  userId          String
+  planVersion     String   @default("v1") // Track which plan version user is on
+  currentDay      Int      @default(1)
+  totalDays       Int      @default(14)
+  currentPhase    String   @default("fundamentals") // fundamentals, tools, projects
+  currentTopic    String?
+  streakDays      Int      @default(0)
+  lastActiveDate  DateTime @default(now())
+  progressPercent Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, planVersion])
+  @@map("user_progress")
+}
+
+// ============================================================================
+// Tasks & Curriculum
+// ============================================================================
+
+model Task {
+  id               String   @id @default(cuid())
+  title            String
+  description      String
+  difficulty       String   // starter, focus, deep
+  estimatedMinutes Int
+  careerTrack      String   // which track this task belongs to
+  phase            String   // fundamentals, tools, projects
+  day              Int      // which day of the sprint
+  resourceUrl      String
+  order            Int      @default(0) // order within the day
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  progress TaskProgress[]
+
+  @@index([careerTrack, day])
+  @@map("tasks")
+}
+
+model TaskProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  taskId      String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, taskId])
+  @@map("task_progress")
+}
+
+// ============================================================================
+// Achievements
+// ============================================================================
+
+model Achievement {
+  id          String   @id @default(cuid())
+  type        String   // streak, completion, project, etc.
+  title       String
+  subtitle    String
+  description String?
+  icon        String?  // icon identifier
+  requirement String   // JSON string describing unlock requirement
+  createdAt   DateTime @default(now())
+
+  // Relations
+  userAchievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String    @id @default(cuid())
+  userId        String
+  achievementId String
+  unlocked      Boolean   @default(false)
+  unlockedAt    DateTime?
+  progress      Int       @default(0) // progress towards unlocking (0-100)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+// ============================================================================
+// Conversations (AI Mentor)
+// ============================================================================
+
+model Conversation {
+  id              String   @id @default(cuid())
+  userId          String
+  conversationId  String?  // External conversation ID if tracking sessions
+  role            String   // user or assistant
+  content         String
+  context         Json?    // Store conversation context (careerTrack, phase, etc.)
+  duration        Int?     // Response time in ms
+  model           String?  // AI model used
+  createdAt       DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("conversations")
 }
