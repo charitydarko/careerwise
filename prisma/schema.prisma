@@ -32,6 +32,8 @@ model User {
   conversations Conversation[]
   achievements  UserAchievement[]
   taskProgress  TaskProgress[]
+  profileAnalysis UserProfileAnalysis?
+  mentorInsights  MentorInsight[]
 
   @@map("users")
 }
@@ -91,7 +93,7 @@ model Task {
   careerTrack      String   // which track this task belongs to
   phase            String   // fundamentals, tools, projects
   day              Int      // which day of the sprint
-  resourceUrl      String
+  resourceUrl      String?
   order            Int      @default(0) // order within the day
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -179,4 +181,41 @@ model Conversation {
 
   @@index([userId, createdAt])
   @@map("conversations")
+}
+
+// ============================================================================
+// AI Mentor & Analysis
+// ============================================================================
+
+model UserProfileAnalysis {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  summary        String   // High-level summary of the learner (e.g. "Visual learner, struggles with async")
+  strengths      String[] // List of identified strengths
+  weaknesses     String[] // List of identified growth areas
+  learningStyle  String?  // Inferred learning style
+  lastAnalyzedAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profile_analysis")
+}
+
+model MentorInsight {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // recommendation, encouragement, warning
+  content   String   // The insight text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime? // Optional expiration for time-sensitive insights
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("mentor_insights")
 }

@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { VoicePanelV2 } from "@/components/voice/voice-panel-v2";
+import { MentorInsights } from "@/components/dashboard/mentor-insights";
 
 import { FadeInSection } from "@/components/fade-in-section";
 import { Badge } from "@/components/ui/badge";
@@ -193,17 +194,17 @@ export default function CurriculumDashboardPage() {
           fetch("/api/tasks"),
           fetch("/api/achievements"),
         ]);
-        
+
         if (progressRes.ok) {
           const data = await progressRes.json();
           setUserData(data);
         }
-        
+
         if (tasksRes.ok) {
           const tasksData = await tasksRes.json();
           setTasks(tasksData.tasks);
         }
-        
+
         if (achievementsRes.ok) {
           const achievementsData = await achievementsRes.json();
           setAchievements(achievementsData.achievements);
@@ -219,10 +220,10 @@ export default function CurriculumDashboardPage() {
 
   const selectedPlan = useMemo(() => {
     if (!userData) return mockPlans[0];
-    
+
     const profile = userData.profile;
     const progress = userData.progress;
-    
+
     return {
       id: "v1",
       label: `${profile?.careerTrack || "Career"} Sprint · v1`,
@@ -303,6 +304,18 @@ export default function CurriculumDashboardPage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <section className="space-y-6">
             <FadeInSection className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur lg:p-8">
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-[#1F3C88] flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-[#00BFA6]" />
+                  Mentor Insights
+                </h3>
+                <MentorInsights />
+              </div>
+            </FadeInSection>
+
+            <FadeInSection className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur lg:p-8">
+              {/* Current day section ... */}
+
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.35em] text-slate-400">
@@ -347,8 +360,8 @@ export default function CurriculumDashboardPage() {
               <ScrollArea className="h-[360px] pr-4">
                 <div className="space-y-4">
                   {selectedPlan.todayTasks.map((task) => (
-                    <TaskCard 
-                      key={task.id} 
+                    <TaskCard
+                      key={task.id}
                       task={task}
                       onToggle={async () => {
                         // Refresh data after task completion
@@ -484,7 +497,7 @@ function TaskCard({ task, onToggle }: { task: DailyTask; onToggle?: () => void }
 
   const handleToggle = async () => {
     if (isUpdating) return;
-    
+
     setIsUpdating(true);
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {

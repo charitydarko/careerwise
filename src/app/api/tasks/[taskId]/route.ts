@@ -125,9 +125,18 @@ export async function PUT(
               lastActiveDate: new Date(),
             },
           });
-          
+
           // Check and unlock achievements after completing a day
           await checkAndUnlockAchievements(userId);
+        }
+
+        // TRIGGER USER PROFILE ANALYSIS
+        // If the task was difficult (focus/deep), trigger analysis to see if they struggled or excelled
+        if (task.difficulty === "focus" || task.difficulty === "deep") {
+          // Run in background
+          import("@/lib/analysis-service").then(service => {
+            service.analyzeUserProfile(userId).catch(err => console.error("Background analysis failed", err));
+          });
         }
       }
     } else {

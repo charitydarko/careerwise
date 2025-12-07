@@ -46,14 +46,60 @@ export async function POST(request: Request) {
     // Convert conversation history to expected format
     const formattedHistory: ConversationMessage[] = conversationHistory
       ? conversationHistory.map((msg, index) => ({
-          role: msg.role === "assistant" ? "mentor" : "user",
-          content: msg.content,
-          timestamp: new Date(),
-        }))
+        role: msg.role === "assistant" ? "mentor" : "user",
+        content: msg.content,
+        timestamp: new Date(),
+      }))
       : [];
 
-    // Generate AI response using voice-optimized prompt (2-3 sentences)
-    const prompt = buildVoiceChatPrompt(message, context, formattedHistory);
+    let systemPromptContext = context;
+
+    // Inject User Profile if available
+    if (userId) {
+      const userProfile = await prisma.userProfileAnalysis.findUnique({
+        where: { userId },
+      });
+
+      if (userProfile) {
+        // Enriched context with long-term memory
+        const profileContext = `\n\nLONG-TERM MEMORY (USER PROFILE):\n- Summary: ${userProfile.summary}\n- Strengths: ${userProfile.strengths.join(", ")}\n- Weaknesses: ${userProfile.weaknesses.join(", ")}\n- Learning Style: ${userProfile.learningStyle || "Unknown"}\n\nADAPT YOUR RESPONSE TO THIS PROFILE.`;
+
+        // We append this to the system prompt implicitly by modifying the context object passed to buildVoiceChatPrompt
+        // Since context is a typed object, we can't easily add dynamic fields without changing the type.
+        // Instead, we'll prepend this to the message or modify the prompt builder.
+        // For minimal invasion, we'll actually fetch the prompt and append this section.
+        // However, buildVoiceChatPrompt takes context. Let's wrap the message with this context for now as a "System Note"
+
+        // Better approach: Let's modify the message to include this context for the AI (invisible to user)
+        // But we want it in the system instruction part.
+        // Let's modify the buildVoiceChatPrompt call to include an optional "systemNote" if we supported it, 
+        // but since we don't want to change the library, we will prepend it to the conversation history as a "system" message if possible,
+        // OR just append it to the system prompt returned by buildVoiceChatPrompt if we could intercept it.
+
+        // Simplest valid approach with current codebase:
+        // We will modify the 'context' object effectively for the prompt generation if it allows extra fields,
+        // or we just assume the prompt builder won't use it but we can append it to the final prompt string.
+      }
+
+      // TRIGGER ANALYSIS (Lazy approach: 1 in 10 chance to update profile after a message)
+      if (Math.random() < 0.1) {
+        // Run in background - don't await
+        import("@/lib/analysis-service").then(service => {
+          service.analyzeUserProfile(userId).catch(err => console.error("Background analysis failed", err));
+        });
+      }
+    }
+
+    // Generate AI response using voice-optimized prompt
+    let prompt = buildVoiceChatPrompt(message, context, formattedHistory);
+
+    // Inject memory manually into the prompt string until we update the prompt builder
+    if (userId) {
+      const userProfile = await prisma.userProfileAnalysis.findUnique({ where: { userId } });
+      if (userProfile) {
+        prompt = prompt.replace("YOUR ROLE:", `LONG-TERM USER PROFILE:\n- Summary: ${userProfile.summary}\n- Strengths: ${userProfile.strengths.join(", ")}\n- Weaknesses: ${userProfile.weaknesses.join(", ")}\n- Learning Style: ${userProfile.learningStyle}\n\nYOUR ROLE:`);
+      }
+    }
 
     const response = await generateText(prompt, MODEL_CONFIGS.BALANCED, {
       timeout: 10000,
