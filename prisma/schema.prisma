@@ -196,6 +196,7 @@ model UserProfileAnalysis {
   strengths      String[] // List of identified strengths
   weaknesses     String[] // List of identified growth areas
   learningStyle  String?  // Inferred learning style
+  inputHash      String?  // Hash of input data for caching
   lastAnalyzedAt DateTime @default(now())
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

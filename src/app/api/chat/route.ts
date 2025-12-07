@@ -6,6 +6,7 @@ import { buildVoiceChatPrompt } from "@/lib/ai-prompts";
 import type { ConversationContext, ConversationMessage } from "@/types/ai";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { LeaderboardService } from "@/lib/leaderboard-service";
 
 /**
  * POST /api/chat
@@ -95,6 +96,7 @@ export async function POST(request: Request) {
       });
 
       if (profile) {
+
         // Fetch active insights
         const insights = await prisma.mentorInsight.findMany({
           where: {
@@ -103,12 +105,36 @@ export async function POST(request: Request) {
             expiresAt: { gt: new Date() }
           },
           take: 3,
-          orderBy: { createdAt: 'desc' } // or priority if we had it
+          orderBy: { createdAt: 'desc' }
         });
+
+        // FETCH GAMIFICATION CONTEXT
+        const progress = await prisma.userProgress.findFirst({
+          where: { userId, planVersion: "v1" }
+        });
+
+        const leaderboard = await LeaderboardService.getWeeklyLeaderboard(userId);
+        const userRank = leaderboard.find(e => e.isUser)?.rank || 0;
+
+        const achievements = await prisma.userAchievement.findMany({
+          where: { userId },
+          include: { achievement: true },
+          orderBy: { unlockedAt: 'desc' },
+          take: 3
+        });
+
+        // ENRICH ANALYSIS
+        const gamificationContext = {
+          level: progress?.level || 1,
+          xp: progress?.currentXp || 0,
+          rank: userRank,
+          recentBadges: achievements.map(ua => ua.achievement.title)
+        };
 
         analysis = {
           ...profile,
-          insights: insights.map(i => ({ content: i.content, type: i.type }))
+          insights: insights.map(i => ({ content: i.content, type: i.type })),
+          gamification: gamificationContext
         };
       }
     }

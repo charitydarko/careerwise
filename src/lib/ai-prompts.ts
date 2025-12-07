@@ -496,6 +496,12 @@ export function buildVoiceSystemPrompt(
     weaknesses: string[];
     learningStyle: string | null;
     insights?: { content: string; type: string }[];
+    gamification?: {
+      level: number;
+      xp: number;
+      rank: number;
+      recentBadges: string[];
+    };
   } | null
 ): string {
   const trackInfo = CAREER_TRACK_INFO[context.careerTrack];
@@ -553,8 +559,17 @@ MENTOR MEMORY (USER PROFILE):
 - Areas for Growth: ${analysis.weaknesses.join(", ")}
 ${analysis.insights && analysis.insights.length > 0 ? `\nACTIVE INSIGHTS TO MENTION:\n${analysis.insights.map(i => `- [${i.type.toUpperCase()}] ${i.content}`).join("\n")}` : ""}
 
+${analysis.gamification ? `GAMIFICATION STATS:
+- Level: ${analysis.gamification.level}
+- XP: ${analysis.gamification.xp}
+- Leaderboard Rank: ${analysis.gamification.rank > 0 ? `#${analysis.gamification.rank}` : "Unranked"}
+- Recent Badges: ${analysis.gamification.recentBadges.join(", ") || "None"}
+` : ""}
+
 INSTRUCTION:
-Use this memory to personalize your advice. If the user has a specific learning style (e.g. "Visual"), try to describe things visually. If they have a known weakness, be extra supportive there.`;
+Use this memory to personalize your advice. If the user has a specific learning style (e.g. "Visual"), try to describe things visually.
+Reflect their Level/Rank in your tone. If they are high level (>10), treat them as a peer. If rank is high, congratulate them.
+If they recently earned a badge, MENTION IT to celebrate!`;
   }
 
   return basePrompt;

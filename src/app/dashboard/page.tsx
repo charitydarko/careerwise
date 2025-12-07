@@ -11,9 +11,13 @@ import {
   Loader2,
   Settings,
   Sparkles,
+  Trophy,
+  Zap,
 } from "lucide-react";
 import { VoicePanelV2 } from "@/components/voice/voice-panel-v2";
 import { MentorInsights } from "@/components/dashboard/mentor-insights";
+import { Leaderboard } from "@/components/dashboard/leaderboard";
+import { ActivityFeed } from "@/components/dashboard/activity-feed";
 
 import { FadeInSection } from "@/components/fade-in-section";
 import { Badge } from "@/components/ui/badge";
@@ -467,6 +471,29 @@ export default function CurriculumDashboardPage() {
                 }}
                 onModeSwitch={() => setShowTextChat(true)}
               />
+            </FadeInSection>
+
+            <FadeInSection className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur lg:p-8">
+              <div className="space-y-3 mb-4">
+                <h3 className="text-lg font-semibold text-[#1F3C88] flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-[#00BFA6]" />
+                  Leaderboard
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Weekly XP ranking.
+                </p>
+              </div>
+              <Leaderboard />
+            </FadeInSection>
+
+            <FadeInSection className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur lg:p-8">
+              <div className="space-y-3 mb-4">
+                <h3 className="text-lg font-semibold text-[#1F3C88] flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-[#00BFA6]" />
+                  Community Live
+                </h3>
+              </div>
+              <ActivityFeed />
             </FadeInSection>
 
             <FadeInSection className="rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur lg:p-8">

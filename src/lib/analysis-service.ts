@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generateJSON, MODEL_CONFIGS } from "@/lib/gemini";
 import type { ProfileAnalysisResult } from "@/types/ai";
 import { updateStreak } from "@/lib/achievement-service";
+import crypto from "crypto";
 
 /**
  * Service to analyze user interactions and update their profile.
@@ -93,6 +94,37 @@ OBJECTIVE:
 }
 `;
 
+    // 2.5 Generate Hash of inputs to check cache
+    const inputString = JSON.stringify({
+        track: user.profile?.careerTrack,
+        level: user.profile?.learningLevel,
+        progress: user.progress[0]?.progressPercent,
+        conversations: conversationHistory, // already last 20
+        tasks: taskHistory
+    });
+
+    const inputHash = crypto.createHash('sha256').update(inputString).digest('hex');
+
+    // CHECK CACHE
+    const lastAnalysis = await prisma.userProfileAnalysis.findUnique({
+        where: { userId }
+    });
+
+    if (lastAnalysis && lastAnalysis.inputHash === inputHash) {
+        console.log(`[Analysis Service] Cache HIT for user ${userId}`);
+        // Return existing analysis mapped to ProfileAnalysisResult
+        // Note: DB stores flattened fields, we need to reconstruct object
+        return {
+            summary: lastAnalysis.summary,
+            strengths: lastAnalysis.strengths,
+            weaknesses: lastAnalysis.weaknesses,
+            learningStyle: lastAnalysis.learningStyle,
+            insights: [] // We don't store raw insights array in ProfileAnalysis model, just created MentorInsights
+        };
+    }
+
+    console.log(`[Analysis Service] Cache MISS for user ${userId}`);
+
     // 3. Generate analysis using Gemini
     try {
         const analysis = await generateJSON<ProfileAnalysisResult>(
@@ -111,6 +143,7 @@ OBJECTIVE:
                 strengths: analysis.strengths,
                 weaknesses: analysis.weaknesses,
                 learningStyle: analysis.learningStyle,
+                inputHash: inputHash, // Save the hash
             },
             update: {
                 summary: analysis.summary,
@@ -118,6 +151,7 @@ OBJECTIVE:
                 weaknesses: analysis.weaknesses,
                 learningStyle: analysis.learningStyle,
                 lastAnalyzedAt: new Date(),
+                inputHash: inputHash // Save the hash
             },
         });
 

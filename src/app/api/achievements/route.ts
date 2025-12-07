@@ -1,11 +1,8 @@
+
+import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
 
-/**
- * GET /api/achievements
- * Fetch all achievements with user's unlock status
- */
 export async function GET() {
   const session = await auth();
 
@@ -16,34 +13,29 @@ export async function GET() {
   try {
     const userId = (session.user as any).id;
 
-    // Fetch all achievements
-    const achievements = await prisma.achievement.findMany({
-      include: {
-        userAchievements: {
-          where: {
-            userId,
-          },
-        },
-      },
+    // 1. Get all Defined Achievements
+    const allAchievements = await prisma.achievement.findMany({
+      orderBy: { title: "asc" }
     });
 
-    // Format achievements with unlock status
-    const formattedAchievements = achievements.map((achievement) => {
-      const userAchievement = achievement.userAchievements[0];
-      return {
-        id: achievement.id,
-        type: achievement.type,
-        title: achievement.title,
-        subtitle: achievement.subtitle,
-        description: achievement.description,
-        icon: achievement.icon,
-        unlocked: userAchievement?.unlocked || false,
-        unlockedAt: userAchievement?.unlockedAt,
-        progress: userAchievement?.progress || 0,
-      };
+    // 2. Get User's Unlocked Achievements
+    const userAchievements = await prisma.userAchievement.findMany({
+      where: { userId }
     });
 
-    return NextResponse.json({ achievements: formattedAchievements });
+    const unlockedIds = new Set(userAchievements.map(ua => ua.achievementId));
+
+    // 3. Map to Response Format
+    const achievements = allAchievements.map(a => ({
+      id: a.id,
+      title: a.title,
+      description: a.description,
+      icon: a.icon,
+      unlocked: unlockedIds.has(a.id),
+      unlockedAt: userAchievements.find(ua => ua.achievementId === a.id)?.unlockedAt || null
+    }));
+
+    return NextResponse.json({ achievements });
   } catch (error) {
     console.error("Error fetching achievements:", error);
     return NextResponse.json(
