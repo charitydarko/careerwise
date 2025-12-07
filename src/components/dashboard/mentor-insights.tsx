@@ -1,61 +1,88 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lightbulb, Trophy, AlertTriangle, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Lightbulb, Info, AlertTriangle, RefreshCw } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
-interface Insight {
+type Insight = {
     id: string;
-    type: "recommendation" | "encouragement" | "warning";
+    type: "recommendation" | "warning" | "encouragement";
     content: string;
-}
+    isRead: boolean;
+};
 
 export function MentorInsights() {
     const [insights, setInsights] = useState<Insight[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        // In a real app, this would be a server action or API call
-        // For now, we'll mock the fetch or implement a simple API later
-        // defaulting to empty to avoid breaking build before API is ready
-        setLoading(false);
-    }, []);
-
-    if (loading || insights.length === 0) {
-        return null;
+    async function fetchInsights() {
+        try {
+            // For now, usage "latest" endpoint until we have a proper list endpoint. 
+            // Or just assume single insight for MVP dashboard.
+            const response = await fetch("/api/mentor/insights/latest");
+            if (response.ok) {
+                const data = await response.json();
+                if (data.insight) {
+                    setInsights([data.insight]);
+                } else {
+                    setInsights([]);
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
     }
 
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        try {
+            await fetch("/api/mentor/analyze", { method: "POST" });
+            // Wait a bit for DB to update?
+            await new Promise(r => setTimeout(r, 2000));
+            await fetchInsights();
+        } catch (e) {
+            console.error("Refresh failed", e);
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchInsights();
+    }, []);
+
+    if (loading) return null;
+    if (insights.length === 0 && !refreshing) return null;
+
     return (
-        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {insights.map((insight) => (
-                <Card
-                    key={insight.id}
-                    className={cn(
-                        "border-l-4",
-                        insight.type === "recommendation" && "border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/20",
-                        insight.type === "encouragement" && "border-l-green-500 bg-green-50/50 dark:bg-green-900/20",
-                        insight.type === "warning" && "border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/20"
-                    )}
-                >
-                    <CardContent className="p-4 flex gap-3 items-start">
-                        <div className="mt-1">
-                            {insight.type === "recommendation" && <Lightbulb className="w-5 h-5 text-blue-500" />}
-                            {insight.type === "encouragement" && <Trophy className="w-5 h-5 text-green-500" />}
-                            {insight.type === "warning" && <AlertTriangle className="w-5 h-5 text-amber-500" />}
+        <div className="flex flex-col gap-3">
+            {insights.map(insight => (
+                <Card key={insight.id} className="p-4 border-l-4 border-l-[#00BFA6] bg-[#ecfdf9]">
+                    <div className="flex items-start gap-3">
+                        <Lightbulb className="h-5 w-5 text-[#007864] mt-0.5" />
+                        <div className="text-sm text-[#007864] flex-1">
+                            <span className="font-semibold block mb-1">Mentor Tip</span>
+                            {insight.content}
                         </div>
-                        <div className="flex-1">
-                            <p className="text-sm font-medium leading-relaxed">
-                                {insight.content}
-                            </p>
-                        </div>
-                        <button className="text-muted-foreground hover:text-foreground">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </CardContent>
+                    </div>
                 </Card>
             ))}
+            <div className="flex justify-end">
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="text-xs text-slate-400 hover:text-[#1F3C88]"
+                >
+                    <RefreshCw className={`mr-2 h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+                    {refreshing ? "Analyzing..." : "Refresh Analysis"}
+                </Button>
+            </div>
         </div>
     );
 }

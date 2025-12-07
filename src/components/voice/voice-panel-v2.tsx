@@ -102,7 +102,9 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
             setTimeout(() => {
               speakText(greeting);
 
-              // TODO: Mark as read via API
+              // Mark as read so we don't say it again
+              fetch(`/api/mentor/insights/${data.insight.id}/read`, { method: "POST" })
+                .catch(err => console.error("[Voice] Failed to mark insight read", err));
             }, 1000);
           }
         }
