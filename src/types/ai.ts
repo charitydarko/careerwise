@@ -405,3 +405,19 @@ export interface AIResult<T> {
   metadata: AIResponseMetadata;
   cached?: boolean;
 }
+
+// ============================================================================
+// User Profile Analysis Types
+// ============================================================================
+
+export interface ProfileAnalysisResult {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  learningStyle: string;
+  insights: Array<{
+    type: "recommendation" | "encouragement" | "warning";
+    content: string;
+    priority: "high" | "medium" | "low";
+  }>;
+}

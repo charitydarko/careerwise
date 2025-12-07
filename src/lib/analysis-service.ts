@@ -1,6 +1,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { generateJSON, MODEL_CONFIGS } from "@/lib/gemini";
+import type { ProfileAnalysisResult } from "@/types/ai";
+import { updateStreak } from "@/lib/achievement-service";
 
 /**
  * Service to analyze user interactions and update their profile.
@@ -11,17 +13,6 @@ import { generateJSON, MODEL_CONFIGS } from "@/lib/gemini";
 // Types
 // ============================================================================
 
-interface ProfileAnalysisResult {
-    summary: string;
-    strengths: string[];
-    weaknesses: string[];
-    learningStyle: string;
-    insights: Array<{
-        type: "recommendation" | "encouragement" | "warning";
-        content: string;
-        priority: "high" | "medium" | "low";
-    }>;
-}
 
 // ============================================================================
 // Core Analysis Logic
@@ -32,6 +23,9 @@ interface ProfileAnalysisResult {
  */
 export async function analyzeUserProfile(userId: string) {
     console.log(`[Analysis Service] Starting analysis for user ${userId}`);
+
+    // 0. Update Streak (Daily Engagement)
+    await updateStreak(userId).catch(e => console.error("Streak update failed", e));
 
     // 1. Fetch recent data
     const user = await prisma.user.findUnique({
@@ -58,46 +52,46 @@ export async function analyzeUserProfile(userId: string) {
     // 2. Prepare data for global context
     const conversationHistory = user.conversations
         .reverse() // Chronological order
-        .map((c) => `${c.role === "assistant" ? "Mentor" : "Learner"}: ${c.content}`)
+        .map((c) => `${c.role === "assistant" ? "Mentor" : "Learner"}: ${c.content} `)
         .join("\n");
 
     const taskHistory = user.taskProgress
-        .map((tp) => `- Task: ${tp.task.title} (${tp.completed ? "Completed" : "In Progress"}) - Notes: ${tp.notes || "None"}`)
+        .map((tp) => `- Task: ${tp.task.title} (${tp.completed ? "Completed" : "In Progress"}) - Notes: ${tp.notes || "None"} `)
         .join("\n");
 
     const prompt = `
   Analyze this learner's recent activity to update their mentorship profile.
   
   LEARNER CONTEXT:
-  - Track: ${user.profile?.careerTrack || "Unknown"}
-  - Level: ${user.profile?.learningLevel || "Unknown"}
-  - Recent Progress: ${user.progress[0]?.progressPercent || 0}%
-  
-  RECENT CONVERSATIONS:
+- Track: ${user.profile?.careerTrack || "Unknown"}
+- Level: ${user.profile?.learningLevel || "Unknown"}
+- Recent Progress: ${user.progress[0]?.progressPercent || 0}%
+
+    RECENT CONVERSATIONS:
   ${conversationHistory}
   
   RECENT TASKS:
   ${taskHistory}
-  
-  OBJECTIVE:
+
+OBJECTIVE:
   Identify the learner's current state, learning style, and specific needs.
   Generate proactive insights to help them succeed.
   
   RETURN JSON OBJECT:
-  {
+{
     "summary": "1-2 sentence high-level summary of their current status and mood",
-    "strengths": ["list", "of", "detected", "strengths"],
-    "weaknesses": ["list", "of", "struggles", "or", "gaps"],
-    "learningStyle": "visual|hands-on|theoretical|mixed",
-    "insights": [
-      {
-        "type": "recommendation|encouragement|warning",
-        "content": "Specific, actionable advice or message",
-        "priority": "high|medium|low"
-      }
-    ]
-  }
-  `;
+        "strengths": ["list", "of", "detected", "strengths"],
+            "weaknesses": ["list", "of", "struggles", "or", "gaps"],
+                "learningStyle": "visual|hands-on|theoretical|mixed",
+                    "insights": [
+                        {
+                            "type": "recommendation|encouragement|warning",
+                            "content": "Specific, actionable advice or message",
+                            "priority": "high|medium|low"
+                        }
+                    ]
+}
+`;
 
     // 3. Generate analysis using Gemini
     try {
@@ -158,7 +152,7 @@ export async function analyzeUserProfile(userId: string) {
         return analysis;
 
     } catch (error) {
-        console.error(`[Analysis Service] Error analyzing user ${userId}:`, error);
+        console.error(`[Analysis Service] Error analyzing user ${userId}: `, error);
         throw error;
     }
 }

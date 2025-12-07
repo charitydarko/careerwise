@@ -48,6 +48,8 @@ type PlanVersion = {
     unlocked: boolean;
   }>;
   streakDays: number;
+  level: number;
+  currentXp: number;
 };
 
 const mockPlans: PlanVersion[] = [
@@ -58,6 +60,8 @@ const mockPlans: PlanVersion[] = [
     totalDays: 14,
     progressPct: 42,
     streakDays: 4,
+    level: 2,
+    currentXp: 150,
     todayTasks: [
       {
         id: "task-1",
@@ -114,6 +118,8 @@ const mockPlans: PlanVersion[] = [
     totalDays: 14,
     progressPct: 29,
     streakDays: 2,
+    level: 1,
+    currentXp: 50,
     todayTasks: [
       {
         id: "task-a",
@@ -231,6 +237,8 @@ export default function CurriculumDashboardPage() {
       totalDays: progress?.totalDays || 14,
       progressPct: progress?.progressPercent || 0,
       streakDays: progress?.streakDays || 0,
+      level: progress?.level || 1,
+      currentXp: progress?.currentXp || 0,
       todayTasks: tasks,
       achievements: achievements.map(a => ({
         id: a.id,
@@ -280,6 +288,12 @@ export default function CurriculumDashboardPage() {
             </p>
           </div>
           <div className="flex flex-col gap-3 md:items-end">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-[#1F3C88] text-white hover:bg-[#1F3C88]/90">
+                Level {selectedPlan.level}
+              </Badge>
+              <span className="text-sm font-medium text-[#1F3C88]">{selectedPlan.currentXp} XP</span>
+            </div>
             <Link href="/settings">
               <Button
                 variant="ghost"

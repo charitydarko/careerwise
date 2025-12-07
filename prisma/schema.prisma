@@ -70,6 +70,8 @@ model UserProgress {
   streakDays      Int      @default(0)
   lastActiveDate  DateTime @default(now())
   progressPercent Int      @default(0)
+  currentXp       Int      @default(0)
+  level           Int      @default(1)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

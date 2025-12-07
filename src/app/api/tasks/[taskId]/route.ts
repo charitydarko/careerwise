@@ -139,6 +139,13 @@ export async function PUT(
           });
         }
       }
+
+      // AWARD GAMIFICATION XP
+      const xpAmount = task.difficulty === "deep" ? 100 : (task.difficulty === "focus" ? 50 : 25);
+      await import("@/lib/gamification-service").then(({ GamificationService }) => {
+        GamificationService.awardXP(userId, xpAmount).catch(e => console.error("XP Award failed", e));
+      });
+
     } else {
       // Check achievements even when marking incomplete (in case progress changes)
       await checkAndUnlockAchievements(userId);

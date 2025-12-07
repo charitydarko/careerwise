@@ -159,9 +159,9 @@ ${userBackground ? `BACKGROUND:\n${userBackground}\n\n` : ""}QUIZ RESPONSES:
 ${responseSummary}
 
 AVAILABLE CAREER TRACKS:
-${Object.entries(CAREER_TRACK_INFO).map(([key, info]) => 
-  `- ${key}: ${info.fullName} - ${info.description}`
-).join("\n")}
+${Object.entries(CAREER_TRACK_INFO).map(([key, info]) =>
+    `- ${key}: ${info.fullName} - ${info.description}`
+  ).join("\n")}
 
 Please analyze the responses and return a JSON object with this structure:
 {
@@ -225,6 +225,56 @@ Return a JSON object with this structure:
 }
 
 Make the content engaging and build confidence. Relate to ${trackInfo.coreSkills.slice(0, 2).join(" and ")}.`;
+}
+
+
+/**
+ * Build a prompt for generating a full lesson (compatible with LessonGenerationResponse)
+ */
+export function buildLessonPrompt(
+  careerTrack: string,
+  phase: string,
+  topic: string,
+  learningLevel: string
+): string {
+  const trackInfo = CAREER_TRACK_INFO[careerTrack as CareerTrack] || CAREER_TRACK_INFO.frontend;
+
+  return `Create a comprehensive coding lesson for ${trackInfo.fullName}.
+
+TOPIC: ${topic}
+CONTEXT: ${phase} phase, ${learningLevel} level.
+
+REQUIREMENTS:
+- Structured sections (Introduction, Core Concept, Implementation, Best Practices)
+- Code examples in ${trackInfo.coreSkills.find(s => s !== "Design") || "JavaScript/Python"}
+- Practical usage scenarios
+- Common pitfalls
+
+Return a JSON object matching this structure (LessonGenerationResponse):
+{
+  "title": "${topic}",
+  "overview": "<1-2 sentence hook>",
+  "sections": [
+    { "heading": "<Section Title>", "content": "<Paragraph text>" }
+  ],
+  "codeExamples": [
+    { 
+      "title": "<Example Name>", 
+      "language": "<language>", 
+      "code": "<code block>", 
+      "explanation": "<how it works>" 
+    }
+  ],
+  "keyTakeaways": ["<point 1>", "<point 2>"],
+  "practice": {
+    "prompt": "<Challenge description>",
+    "steps": ["<step 1>", "<step 2>"],
+    "expectedOutcome": "<what success looks like>"
+  },
+  "estimatedMinutes": <5-10>
+}
+
+Be educational, clear, and encouraging.`;
 }
 
 /**
@@ -324,7 +374,7 @@ export function buildProjectReviewPrompt(
   rubricCriteria: string[]
 ): string {
   const trackInfo = CAREER_TRACK_INFO[careerTrack];
-  const filesPreview = codeFiles.map(f => 
+  const filesPreview = codeFiles.map(f =>
     `${f.filename}:\n\`\`\`\n${f.content.substring(0, 1000)}${f.content.length > 1000 ? "...(truncated)" : ""}\n\`\`\``
   ).join("\n\n");
 
@@ -375,7 +425,7 @@ export function formatConversationHistory(
   maxMessages: number = 10
 ): string {
   const recentMessages = messages.slice(-maxMessages);
-  
+
   return recentMessages
     .map(msg => `${msg.role === "mentor" ? "Mentor" : "Learner"}: ${msg.content}`)
     .join("\n\n");
@@ -389,13 +439,13 @@ export function buildMentorChatContext(
   conversationHistory?: ConversationMessage[]
 ): string {
   const systemPrompt = buildMentorSystemPrompt(context);
-  
+
   let fullContext = systemPrompt;
-  
+
   if (conversationHistory && conversationHistory.length > 0) {
     fullContext += `\n\n--- CONVERSATION HISTORY ---\n${formatConversationHistory(conversationHistory)}`;
   }
-  
+
   return fullContext;
 }
 
@@ -406,7 +456,7 @@ export function extractTopicsFromMessages(messages: ConversationMessage[]): stri
   // This is a simple implementation - could be enhanced with NLP
   const allText = messages.map(m => m.content).join(" ").toLowerCase();
   const topics: string[] = [];
-  
+
   // Extract common technical terms
   const topicPatterns = [
     /\b(react|vue|angular|svelte)\b/gi,
@@ -414,14 +464,14 @@ export function extractTopicsFromMessages(messages: ConversationMessage[]): stri
     /\b(api|database|server|deployment)\b/gi,
     /\b(testing|debugging|performance)\b/gi,
   ];
-  
+
   topicPatterns.forEach(pattern => {
     const matches = allText.match(pattern);
     if (matches) {
       topics.push(...new Set(matches.map(m => m.toLowerCase())));
     }
   });
-  
+
   return Array.from(new Set(topics)).slice(0, 5);
 }
 
@@ -438,11 +488,22 @@ export function extractTopicsFromMessages(messages: ConversationMessage[]): stri
  * - No formatting (bullets, code blocks, emojis)
  * - Include natural pauses
  */
-export function buildVoiceSystemPrompt(context: ConversationContext): string {
+export function buildVoiceSystemPrompt(
+  context: ConversationContext,
+  analysis?: {
+    summary: string;
+    strengths: string[];
+    weaknesses: string[];
+    learningStyle: string | null;
+    insights?: { content: string; type: string }[];
+  } | null
+): string {
   const trackInfo = CAREER_TRACK_INFO[context.careerTrack];
   const persona = MENTOR_PERSONAS[context.careerTrack];
 
-  return `You are ${persona.name}, an AI mentor speaking to a learner via VOICE.
+
+
+  const basePrompt = `You are ${persona.name}, an AI mentor speaking to a learner via VOICE.
 
 PERSONA:
 ${persona.personality}
@@ -479,8 +540,26 @@ YOUR ROLE:
 - Build confidence through encouragement
 - Keep it conversational and human
 
+
 Remember: You're SPEAKING, not writing. Keep it short, warm, and natural.`;
+
+  if (analysis) {
+    return `${basePrompt}
+
+MENTOR MEMORY (USER PROFILE):
+- Summary: ${analysis.summary}
+- Learning Style: ${analysis.learningStyle || "Unknown"}
+- Strengths: ${analysis.strengths.join(", ")}
+- Areas for Growth: ${analysis.weaknesses.join(", ")}
+${analysis.insights && analysis.insights.length > 0 ? `\nACTIVE INSIGHTS TO MENTION:\n${analysis.insights.map(i => `- [${i.type.toUpperCase()}] ${i.content}`).join("\n")}` : ""}
+
+INSTRUCTION:
+Use this memory to personalize your advice. If the user has a specific learning style (e.g. "Visual"), try to describe things visually. If they have a known weakness, be extra supportive there.`;
+  }
+
+  return basePrompt;
 }
+
 
 /**
  * Build voice-optimized prompt for user message
@@ -488,22 +567,23 @@ Remember: You're SPEAKING, not writing. Keep it short, warm, and natural.`;
 export function buildVoiceChatPrompt(
   userMessage: string,
   context: ConversationContext,
-  conversationHistory?: ConversationMessage[]
+  conversationHistory?: ConversationMessage[],
+  analysis?: any // We pass this through to system prompt
 ): string {
-  const systemPrompt = buildVoiceSystemPrompt(context);
-  
+  const systemPrompt = buildVoiceSystemPrompt(context, analysis);
+
   let fullPrompt = systemPrompt;
-  
+
   // Add recent context if available
   if (conversationHistory && conversationHistory.length > 0) {
     const recentHistory = formatConversationHistory(conversationHistory, 5);
     fullPrompt += `\n\n--- RECENT CONVERSATION ---\n${recentHistory}`;
   }
-  
+
   // Add current user message
   fullPrompt += `\n\n--- LEARNER JUST SAID (via voice) ---\n${userMessage}`;
-  
+
   fullPrompt += `\n\n--- YOUR VOICE RESPONSE (remember: 2-3 sentences max, conversational, no formatting) ---`;
-  
+
   return fullPrompt;
 }
