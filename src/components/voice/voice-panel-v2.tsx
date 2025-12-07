@@ -46,8 +46,8 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
   const voiceProfile = getVoiceProfile(context.careerTrack);
 
   // Check if Speech Recognition is available
-  const isSpeechRecognitionAvailable = 
-    typeof window !== 'undefined' && 
+  const isSpeechRecognitionAvailable =
+    typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 
   // Load conversation history on mount
@@ -75,6 +75,45 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
     loadHistory();
   }, []);
 
+  // Proactive Mentor Greeting
+  useEffect(() => {
+    async function checkProactiveGreeting() {
+      // Only run if we are just opening the panel (e.g. valid session) and haven't spoken yet
+      // But this component mounts/unmounts. 
+      // We'll trust the API to return an insight only if it's relevant/unread.
+      try {
+        const res = await fetch('/api/mentor/insights/latest');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.insight) {
+            const greeting = `Welcome back! I have a thought for you: ${data.insight.content}`;
+
+            // Add to chat UI
+            setMessages(prev => [...prev, {
+              id: `msg_proactive_${Date.now()}`,
+              role: "assistant",
+              content: greeting,
+              timestamp: new Date()
+            }]);
+
+            // Speak it
+            // We need to wait a bit for voices to load potentially, but speakText handles checks.
+            // Small delay to feel natural after opening
+            setTimeout(() => {
+              speakText(greeting);
+
+              // TODO: Mark as read via API
+            }, 1000);
+          }
+        }
+      } catch (e) {
+        console.error("[Voice] Failed to fetch proactive greeting", e);
+      }
+    }
+
+    checkProactiveGreeting();
+  }, []); // Run once on mount
+
   // Initialize Speech Recognition
   useEffect(() => {
     if (!isSpeechRecognitionAvailable) {
@@ -84,7 +123,7 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    
+
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
@@ -93,7 +132,7 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
     recognition.onresult = async (event: any) => {
       const transcript = event.results[0][0].transcript;
       console.log('[Voice] Transcribed:', transcript);
-      
+
       // Add user message
       const userMessage: Message = {
         id: `msg_${Date.now()}_user`,
@@ -139,7 +178,7 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
 
     setError(null);
     setIsRecording(true);
-    
+
     try {
       recognitionRef.current.start();
       console.log('[Voice] Started recording');
@@ -159,7 +198,7 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
     } catch (err) {
       console.error('[Voice] Failed to stop:', err);
     }
-    
+
     setIsRecording(false);
   };
 
@@ -279,7 +318,7 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
             <p className="text-sm mt-2">Loading conversation history...</p>
           </div>
         )}
-        
+
         {!isLoadingHistory && messages.length === 0 && (
           <div className="text-center text-gray-500 mt-8">
             <p>Hold the button below and start speaking</p>

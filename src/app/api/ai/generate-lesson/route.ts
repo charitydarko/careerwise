@@ -3,6 +3,8 @@
 import { NextResponse } from "next/server";
 
 import { generateJSON, MODEL_CONFIGS } from "@/lib/gemini";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import type {
   LessonGenerationRequest,
   LessonGenerationResponse,
@@ -47,13 +49,22 @@ export async function POST(req: Request) {
 
     const targetMinutes = estimatedMinutes ?? 25;
 
+    // Fetch User Profile if authenticated
+    const session = await auth();
+    let userProfile = null;
+    if (session?.user) {
+      userProfile = await prisma.userProfileAnalysis.findUnique({
+        where: { userId: (session.user as any).id }
+      });
+    }
+
     const prompt = buildLessonPrompt({
       topic,
       difficulty,
       careerTrack,
       estimatedMinutes: targetMinutes,
       focusArea,
-    });
+    }, userProfile);
 
     const lesson = await generateJSON<LessonGenerationResponse>(
       prompt,
@@ -95,15 +106,32 @@ export async function POST(req: Request) {
   }
 }
 
-function buildLessonPrompt(input: LessonGenerationRequest): string {
+function buildLessonPrompt(input: LessonGenerationRequest, profile: any | null): string {
   const focus = input.focusArea
     ? `Primary focus: ${input.focusArea}.`
     : "Emphasize practical, immediately usable guidance.";
+
+  let personalization = "";
+  if (profile) {
+    personalization = `
+USER PROFILE (ADAPT CONTENT TO THIS):
+- Strengths: ${profile.strengths.join(", ")}
+- Weaknesses: ${profile.weaknesses.join(", ")}
+- Learning Style: ${profile.learningStyle}
+- Summary: ${profile.summary}
+
+INSTRUCTIONS FOR ADAPTATION:
+- If visual learner: Request ASCII diagrams or descriptions of visual flows.
+- If weakness matches topic: Simplify explanations and add extra examples.
+- If strength matches topic: Go deeper and challenge the learner.
+`;
+  }
 
   return `
 You are an expert mentor for ${input.careerTrack} learners.
 Create a concise ${input.difficulty} lesson about "${input.topic}" designed to be completed in ${input.estimatedMinutes} minutes.
 ${focus}
+${personalization}
 
 Return a JSON object matching this shape exactly:
 {
