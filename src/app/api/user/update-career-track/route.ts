@@ -15,22 +15,21 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { careerTrack } = await request.json();
+    const { trackId } = await request.json();
 
-    if (!careerTrack) {
+    if (!trackId) {
       return NextResponse.json(
-        { error: "Career track is required" },
+        { error: "Track is required" },
         { status: 400 }
       );
     }
 
-    // Validate career track
-    const validTracks = ["frontend", "data", "cloud", "ux", "backend"];
-    if (!validTracks.includes(careerTrack.toLowerCase())) {
-      return NextResponse.json(
-        { error: "Invalid career track" },
-        { status: 400 }
-      );
+    const track = await prisma.track.findUnique({
+      where: { id: trackId },
+    });
+
+    if (!track) {
+      return NextResponse.json({ error: "Invalid track" }, { status: 400 });
     }
 
     // Find user
@@ -49,10 +48,10 @@ export async function PUT(request: NextRequest) {
     // Update or create career profile
     const updatedProfile = await prisma.careerProfile.upsert({
       where: { userId: user.id },
-      update: { careerTrack: careerTrack.toLowerCase() },
+      update: { careerTrack: track.name },
       create: {
         userId: user.id,
-        careerTrack: careerTrack.toLowerCase(),
+        careerTrack: track.name,
         learningLevel: "beginner",
         onboardingComplete: false,
       },

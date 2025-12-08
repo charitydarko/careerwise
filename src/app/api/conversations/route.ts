@@ -14,7 +14,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "50");
 

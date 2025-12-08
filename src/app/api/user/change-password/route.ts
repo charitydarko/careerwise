@@ -11,7 +11,12 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 

@@ -20,7 +20,12 @@ export async function POST(request: Request) {
   try {
     // Check authentication
     const session = await auth();
-    const userId = session?.user ? (session.user as any).id : null;
+    const userId =
+      (session?.user as any)?.id || (session?.user as any)?.sub || null;
+
+    if (!session?.user || !userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Parse request body
     const body = await request.json();

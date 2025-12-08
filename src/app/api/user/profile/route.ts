@@ -10,13 +10,19 @@ export async function GET() {
   }
 
   try {
-    const profile = await prisma.careerProfile.findUnique({
-      where: {
-        userId: (session.user as any).id,
-      },
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { profile: true },
     });
 
-    return NextResponse.json({ profile });
+    return NextResponse.json({ profile: user?.profile, user });
   } catch (error) {
     console.error("Error fetching profile:", error);
     return NextResponse.json(
@@ -37,7 +43,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { careerTrack, timeCommitment, preferredLearning, goal } = body;
 
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Upsert career profile
     const profile = await prisma.careerProfile.upsert({

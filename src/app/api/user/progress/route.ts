@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { updateStreak } from "@/lib/achievement-service";
+import { checkAndAdvanceDay } from "@/lib/day-progression-service";
 
 export async function GET() {
   const session = await auth();
@@ -11,7 +12,15 @@ export async function GET() {
   }
 
   try {
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Check and advance day if needed (before updating streak)
+    const dayAdvancement = await checkAndAdvanceDay(userId);
 
     // Update streak when user accesses dashboard
     await updateStreak(userId);
@@ -40,6 +49,7 @@ export async function GET() {
         id: user.id,
         name: user.name,
         email: user.email,
+        isSuperAdmin: user.isSuperAdmin,
       },
       profile: user.profile,
       progress: currentProgress || {
@@ -49,6 +59,11 @@ export async function GET() {
         streakDays: 0,
         progressPercent: 0,
       },
+      dayAdvancement: dayAdvancement.advanced ? {
+        advanced: true,
+        newDay: dayAdvancement.newDay,
+        message: dayAdvancement.message
+      } : null
     });
   } catch (error) {
     console.error("Error fetching user progress:", error);
@@ -67,7 +82,12 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const body = await request.json();
     const { currentDay, streakDays, progressPercent } = body;
 

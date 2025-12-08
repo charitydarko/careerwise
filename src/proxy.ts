@@ -1,8 +1,8 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
-// Middleware uses Edge runtime
-export const runtime = "edge";
+// Proxy runs on the experimental edge runtime
+export const runtime = "experimental-edge";
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth;

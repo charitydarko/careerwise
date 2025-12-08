@@ -11,7 +11,12 @@ export async function GET() {
     }
 
     try {
-        const userId = (session.user as any).id;
+        const userId =
+          (session.user as any).id || (session.user as any).sub || null;
+
+        if (!userId) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
 
         const insights = await prisma.mentorInsight.findMany({
             where: { userId },
@@ -27,4 +32,3 @@ export async function GET() {
         );
     }
 }
-

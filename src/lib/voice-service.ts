@@ -79,8 +79,18 @@ export const MENTOR_VOICE_PROFILES: Record<CareerTrack, VoiceProfile> = {
 /**
  * Get voice profile for a career track
  */
-export function getVoiceProfile(careerTrack: CareerTrack): VoiceProfile {
-  return MENTOR_VOICE_PROFILES[careerTrack];
+export function getVoiceProfile(
+  careerTrack?: CareerTrack | string,
+): VoiceProfile {
+  const key = (careerTrack || "").toLowerCase();
+  const profile =
+    MENTOR_VOICE_PROFILES[key as CareerTrack] ?? MENTOR_VOICE_PROFILES.frontend;
+
+  // Preserve the requested track name to help with logging/consistency
+  return {
+    ...profile,
+    careerTrack: (careerTrack as any) || profile.careerTrack,
+  };
 }
 
 // ============================================================================

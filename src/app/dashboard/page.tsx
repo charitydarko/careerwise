@@ -10,6 +10,7 @@ import {
   Flame,
   Loader2,
   Settings,
+  ShieldCheck,
   Sparkles,
   Trophy,
   Zap,
@@ -194,6 +195,7 @@ export default function CurriculumDashboardPage() {
   const [userData, setUserData] = useState<any>(null);
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [achievements, setAchievements] = useState<any[]>([]);
+  const [dayAdvancement, setDayAdvancement] = useState<{ newDay: number; message: string } | null>(null);
   const [showTextChat, setShowTextChat] = useState(false);
 
   useEffect(() => {
@@ -208,6 +210,13 @@ export default function CurriculumDashboardPage() {
         if (progressRes.ok) {
           const data = await progressRes.json();
           setUserData(data);
+
+          // Check if day advanced
+          if (data.dayAdvancement?.advanced) {
+            setDayAdvancement(data.dayAdvancement);
+            // Auto-hide after 5 seconds
+            setTimeout(() => setDayAdvancement(null), 5000);
+          }
         }
 
         if (tasksRes.ok) {
@@ -261,6 +270,8 @@ export default function CurriculumDashboardPage() {
     return `Day ${currentDay} · ${Math.round((currentDay / totalDays) * 100)}% of sprint`;
   }, [selectedPlan]);
 
+  const isSuperAdmin = Boolean(userData?.user?.isSuperAdmin);
+
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#f3f6ff]">
@@ -278,6 +289,27 @@ export default function CurriculumDashboardPage() {
 
   return (
     <main className="min-h-screen bg-[#f3f6ff] pb-16 pt-12 font-[family:var(--font-inter)]">
+      {/* Day Advancement Toast */}
+      {dayAdvancement && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="rounded-2xl border border-[#00BFA6]/30 bg-[#ecfdf9] px-6 py-4 shadow-lg backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#00BFA6]">
+                <CalendarCheck className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-[#007864]">
+                  🎉 Welcome to Day {dayAdvancement.newDay}!
+                </p>
+                <p className="text-sm text-slate-600">
+                  New tasks are ready for you
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 lg:px-10">
         <header className="flex flex-col gap-6 rounded-3xl border border-white/80 bg-white/95 p-6 shadow-[0_18px_80px_rgba(31,60,136,0.12)] backdrop-blur md:flex-row md:items-center md:justify-between md:p-8">
           <div className="space-y-2">
@@ -298,16 +330,30 @@ export default function CurriculumDashboardPage() {
               </Badge>
               <span className="text-sm font-medium text-[#1F3C88]">{selectedPlan.currentXp} XP</span>
             </div>
-            <Link href="/settings">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-2 text-slate-600 hover:text-[#1F3C88]"
-              >
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </Button>
-            </Link>
+            <div className="flex flex-wrap justify-end gap-2">
+              {isSuperAdmin && (
+                <Link href="/super-admin">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-2 border-[#1F3C88]/30 text-[#1F3C88] hover:border-[#1F3C88]/50 hover:text-[#1F3C88]"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>Super admin</span>
+                  </Button>
+                </Link>
+              )}
+              <Link href="/settings">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex items-center gap-2 text-slate-600 hover:text-[#1F3C88]"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </Button>
+              </Link>
+            </div>
             <div className="rounded-3xl border border-[#00BFA6]/20 bg-[#ecfdf9] px-5 py-3 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#007864]">
                 Career Track

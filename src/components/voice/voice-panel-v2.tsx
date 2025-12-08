@@ -302,7 +302,7 @@ export function VoicePanelV2({ context, onModeSwitch }: VoicePanelV2Props) {
             "w-2 h-2 rounded-full",
             isRecording ? "bg-red-500 animate-pulse" : "bg-gray-300"
           )} />
-          <h3 className="font-semibold">Voice Chat with {voiceProfile.name}</h3>
+          <h3 className="font-semibold">Voice Chat with {voiceProfile?.name || "your mentor"}</h3>
         </div>
         {onModeSwitch && (
           <Button onClick={onModeSwitch} variant="ghost" size="sm">

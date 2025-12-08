@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import { Lock, Mail, Sparkles } from "lucide-react";
 
@@ -39,8 +39,11 @@ export default function LoginPage() {
       return;
     }
 
+    const session = await getSession();
+    const isSuperAdmin = Boolean((session?.user as any)?.isSuperAdmin);
+
     setStatus("success");
-    router.push("/dashboard");
+    router.push(isSuperAdmin ? "/super-admin" : "/dashboard");
   };
 
   return (

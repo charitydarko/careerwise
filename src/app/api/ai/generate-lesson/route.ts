@@ -23,7 +23,12 @@ export async function POST(req: Request) {
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const body = (await req.json()) as Partial<LessonGenerationRequest>;
     const { topic, difficulty, careerTrack, estimatedMinutes, focusArea } =

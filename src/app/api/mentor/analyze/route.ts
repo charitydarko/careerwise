@@ -6,12 +6,17 @@ import { NextResponse } from "next/server";
 export async function POST() {
     const session = await auth();
 
-    if (!session?.user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-    try {
-        const userId = (session.user as any).id;
+  try {
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
         // Trigger analysis immediately
         await analyzeUserProfile(userId);

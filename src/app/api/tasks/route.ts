@@ -14,7 +14,12 @@ export async function GET() {
   }
 
   try {
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // Get user profile and progress
     const user = await prisma.user.findUnique({

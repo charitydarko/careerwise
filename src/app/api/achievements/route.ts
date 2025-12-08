@@ -11,7 +11,12 @@ export async function GET() {
   }
 
   try {
-    const userId = (session.user as any).id;
+    const userId =
+      (session.user as any).id || (session.user as any).sub || null;
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // 1. Get all Defined Achievements
     const allAchievements = await prisma.achievement.findMany({

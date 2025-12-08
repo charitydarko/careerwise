@@ -15,7 +15,12 @@ export async function GET() {
     }
 
     try {
-        const userId = (session.user as any).id;
+        const userId =
+          (session.user as any).id || (session.user as any).sub || null;
+
+        if (!userId) {
+          return NextResponse.json({ insight: null, error: "Unauthorized" }, { status: 401 });
+        }
 
         // Find the latest unread insight (prefer high priority)
         // We want to be proactive, so we look for something relevant.

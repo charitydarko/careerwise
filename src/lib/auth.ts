@@ -49,6 +49,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name || null,
           careerTrack: user.profile?.careerTrack || null,
+          isSuperAdmin: user.isSuperAdmin,
         };
       },
     }),
@@ -66,6 +67,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.careerTrack = (user as any).careerTrack;
+        token.isSuperAdmin = (user as any).isSuperAdmin;
       }
       return token;
     },
@@ -73,6 +75,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).careerTrack = token.careerTrack;
+        (session.user as any).isSuperAdmin = token.isSuperAdmin;
       }
       return session;
     },

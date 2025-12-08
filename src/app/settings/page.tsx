@@ -41,7 +41,8 @@ export default function SettingsPage() {
   const [passwordMessage, setPasswordMessage] = useState<{type: "success" | "error", text: string} | null>(null);
 
   // Career track form state
-  const [careerTrack, setCareerTrack] = useState("");
+  const [careerTrackId, setCareerTrackId] = useState("");
+  const [tracks, setTracks] = useState<Array<{ id: string; name: string }>>([]);
   const [careerSaving, setCareerSaving] = useState(false);
   const [careerMessage, setCareerMessage] = useState<{type: "success" | "error", text: string} | null>(null);
 
@@ -54,13 +55,31 @@ export default function SettingsPage() {
   useEffect(() => {
     async function fetchUserData() {
       try {
-        const response = await fetch("/api/user/profile");
-        if (response.ok) {
-          const data = await response.json();
-          setUserData(data);
-          setName(data.user?.name || "");
-          setEmail(data.user?.email || "");
-          setCareerTrack(data.profile?.careerTrack || "");
+        const [profileRes, tracksRes] = await Promise.all([
+          fetch("/api/user/profile"),
+          fetch("/api/tracks"),
+        ]);
+
+        let profileData: any = null;
+        if (profileRes.ok) {
+          profileData = await profileRes.json();
+          setUserData(profileData);
+          setName(profileData.user?.name || "");
+          setEmail(profileData.user?.email || "");
+        }
+
+        if (tracksRes.ok) {
+          const trackData = await tracksRes.json();
+          const availableTracks = trackData.tracks as Array<{ id: string; name: string }>;
+          setTracks(availableTracks);
+
+          const profileTrackName = profileData?.profile?.careerTrack || "";
+          const matchedTrack = availableTracks.find(
+            (track) => track.name.toLowerCase() === profileTrackName?.toLowerCase(),
+          );
+          if (matchedTrack) {
+            setCareerTrackId(matchedTrack.id);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch user data:", error);
@@ -150,17 +169,13 @@ export default function SettingsPage() {
       const response = await fetch("/api/user/update-career-track", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ careerTrack }),
+        body: JSON.stringify({ trackId: careerTrackId }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
         setCareerMessage({ type: "success", text: data.message || "Career track updated successfully!" });
-        // Redirect to dashboard after 2 seconds
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 2000);
       } else {
         setCareerMessage({ type: "error", text: data.error || "Failed to update career track" });
       }
@@ -299,16 +314,16 @@ export default function SettingsPage() {
                   Select Career Track
                 </label>
                 <select
-                  value={careerTrack}
-                  onChange={(e) => setCareerTrack(e.target.value)}
+                  value={careerTrackId}
+                  onChange={(e) => setCareerTrackId(e.target.value)}
                   className="mt-2 h-12 w-full rounded-full border border-slate-200 bg-white px-4 text-slate-700 focus:border-[#1F3C88] focus:outline-none focus:ring-2 focus:ring-[#1F3C88]/20"
                 >
                   <option value="">Select a track...</option>
-                  <option value="frontend">Frontend Development</option>
-                  <option value="data">Data Science & Analytics</option>
-                  <option value="cloud">Cloud & DevOps</option>
-                  <option value="ux">UX Design</option>
-                  <option value="backend">Backend Development</option>
+                  {tracks.map((track) => (
+                    <option key={track.id} value={track.id}>
+                      {track.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -329,7 +344,11 @@ export default function SettingsPage() {
 
               <Button
                 type="submit"
-                disabled={careerSaving || !careerTrack || careerTrack === userData?.profile?.careerTrack}
+                disabled={
+                  careerSaving ||
+                  !careerTrackId ||
+                  tracks.find((track) => track.id === careerTrackId)?.name === userData?.profile?.careerTrack
+                }
                 className="h-12 rounded-full bg-[#1F3C88] px-6 text-white hover:bg-[#152d6b] disabled:opacity-50"
               >
                 {careerSaving ? (
